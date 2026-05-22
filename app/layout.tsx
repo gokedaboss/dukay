@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Dükay — See what the comments are really saying",
-  description: "Know if the backlash is real, mixed, or just noise. Paste any social media link and get instant comment intelligence.",
+  title: "Dükay",
+  description: "Understand what people are really saying in the comments.",
 };
 
 export default function RootLayout({
