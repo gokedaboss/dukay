@@ -1,8 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { ApifyClient } from "apify-client";
 import { NextRequest, NextResponse } from "next/server";
 
-const client = new Anthropic({
+const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const apify = new ApifyClient({
+  token: process.env.APIFY_API_TOKEN,
 });
 
 const DUKAY_PROMPT = `You are Dükay, a comment intelligence engine.
@@ -49,13 +54,66 @@ Rules:
 - Interpret tone within the cultural context of the language used
 - Write like a sharp confident human — not a corporate AI`;
 
+function detectPlatform(url: string): string {
+  if (url.includes("instagram.com")) return "instagram";
+  if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
+  if (url.includes("reddit.com")) return "reddit";
+  if (url.includes("tiktok.com")) return "tiktok";
+  if (url.includes("x.com") || url.includes("twitter.com")) return "twitter";
+  if (url.includes("facebook.com")) return "facebook";
+  return "unknown";
+}
+
+async function fetchInstagramComments(url: string): Promise<string[]> {
+  const run = await apify.actor("apify/instagram-comment-scraper").call({
+    directUrls: [url],
+    resultsLimit: 100,
+  });
+
+  const { items } = await apify.dataset(run.defaultDatasetId).listItems();
+
+  return items
+    .map((item: Record<string, unknown>) => {
+      const text = item.text || item.comment || item.body;
+      return typeof text === "string" ? text.trim() : null;
+    })
+    .filter((text): text is string => !!text && text.length > 3);
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { comments } = await request.json();
+    const { url } = await request.json();
 
-    if (!comments || !Array.isArray(comments) || comments.length === 0) {
+    if (!url) {
       return NextResponse.json(
-        { error: "No comments provided" },
+        { error: "No URL provided" },
+        { status: 400 }
+      );
+    }
+
+    const platform = detectPlatform(url);
+
+    if (platform === "unknown") {
+      return NextResponse.json(
+        { error: "Unsupported platform" },
+        { status: 400 }
+      );
+    }
+
+    let comments: string[] = [];
+
+    if (platform === "instagram") {
+      comments = await fetchInstagramComments(url);
+    } else {
+      return NextResponse.json(
+        { error: "Only Instagram is supported right now. YouTube and Reddit coming soon." },
+        { status: 400 }
+      );
+    }
+
+    if (comments.length === 0) {
+      return NextResponse.json(
+        { error: "No comments found for this post." },
         { status: 400 }
       );
     }
@@ -65,7 +123,7 @@ export async function POST(request: NextRequest) {
       .map((c: string, i: number) => `${i + 1}. ${c}`)
       .join("\n");
 
-    const message = await client.messages.create({
+    const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
       messages: [
@@ -80,12 +138,12 @@ export async function POST(request: NextRequest) {
       message.content[0].type === "text" ? message.content[0].text : "";
 
     const cleaned = responseText
-  .replace(/^```json\s*/i, "")
-  .replace(/^```\s*/i, "")
-  .replace(/```\s*$/i, "")
-  .trim();
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/```\s*$/i, "")
+      .trim();
 
-const analysis = JSON.parse(cleaned);
+    const analysis = JSON.parse(cleaned);
 
     return NextResponse.json({ analysis });
   } catch (error) {
