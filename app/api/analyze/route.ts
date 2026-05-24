@@ -61,6 +61,7 @@ function detectPlatform(url: string): string {
   if (url.includes("tiktok.com")) return "tiktok";
   if (url.includes("x.com") || url.includes("twitter.com")) return "twitter";
   if (url.includes("facebook.com")) return "facebook";
+  if (url.includes("linkedin.com")) return "linkedin";
   return "unknown";
 }
 
@@ -69,9 +70,7 @@ async function fetchInstagramComments(url: string): Promise<string[]> {
     directUrls: [url],
     resultsLimit: 100,
   });
-
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
-
   return items
     .map((item: Record<string, unknown>) => {
       const text = item.text || item.comment || item.body;
@@ -85,9 +84,7 @@ async function fetchYouTubeComments(url: string): Promise<string[]> {
     startUrls: [{ url }],
     maxComments: 100,
   });
-
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
-
   return items
     .map((item: Record<string, unknown>) => {
       const text = item.text || item.comment || item.body;
@@ -102,12 +99,66 @@ async function fetchRedditComments(url: string): Promise<string[]> {
     skipComments: false,
     maxItems: 100,
   });
-
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
-
   return items
     .map((item: Record<string, unknown>) => {
       const text = item.body || item.text || item.comment;
+      return typeof text === "string" ? text.trim() : null;
+    })
+    .filter((text): text is string => !!text && text.length > 3);
+}
+
+async function fetchTikTokComments(url: string): Promise<string[]> {
+  const run = await apify.actor("clockworks/tiktok-comments-scraper").call({
+    postURLs: [url],
+    maxComments: 100,
+  });
+  const { items } = await apify.dataset(run.defaultDatasetId).listItems();
+  return items
+    .map((item: Record<string, unknown>) => {
+      const text = item.text || item.comment || item.body;
+      return typeof text === "string" ? text.trim() : null;
+    })
+    .filter((text): text is string => !!text && text.length > 3);
+}
+
+async function fetchXComments(url: string): Promise<string[]> {
+  const run = await apify.actor("scraper_one/x-post-replies-scraper").call({
+    postUrls: [url],
+    resultsLimit: 100,
+  });
+  const { items } = await apify.dataset(run.defaultDatasetId).listItems();
+  return items
+    .map((item: Record<string, unknown>) => {
+      const text = item.text || item.comment || item.body || item.full_text;
+      return typeof text === "string" ? text.trim() : null;
+    })
+    .filter((text): text is string => !!text && text.length > 3);
+}
+
+async function fetchFacebookComments(url: string): Promise<string[]> {
+  const run = await apify.actor("apify/facebook-comments-scraper").call({
+    startUrls: [{ url }],
+    maxComments: 100,
+  });
+  const { items } = await apify.dataset(run.defaultDatasetId).listItems();
+  return items
+    .map((item: Record<string, unknown>) => {
+      const text = item.message || item.text || item.comment || item.body;
+      return typeof text === "string" ? text.trim() : null;
+    })
+    .filter((text): text is string => !!text && text.length > 3);
+}
+
+async function fetchLinkedInComments(url: string): Promise<string[]> {
+  const run = await apify.actor("apimaestro/linkedin-post-comments-replies-engagements-scraper-no-cookies").call({
+    postUrls: [url],
+    maxComments: 100,
+  });
+  const { items } = await apify.dataset(run.defaultDatasetId).listItems();
+  return items
+    .map((item: Record<string, unknown>) => {
+      const text = item.text || item.comment || item.body || item.commentText;
       return typeof text === "string" ? text.trim() : null;
     })
     .filter((text): text is string => !!text && text.length > 3);
@@ -118,19 +169,13 @@ export async function POST(request: NextRequest) {
     const { url } = await request.json();
 
     if (!url) {
-      return NextResponse.json(
-        { error: "No URL provided" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No URL provided" }, { status: 400 });
     }
 
     const platform = detectPlatform(url);
 
     if (platform === "unknown") {
-      return NextResponse.json(
-        { error: "Unsupported platform" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Unsupported platform" }, { status: 400 });
     }
 
     let comments: string[] = [];
@@ -141,18 +186,18 @@ export async function POST(request: NextRequest) {
       comments = await fetchYouTubeComments(url);
     } else if (platform === "reddit") {
       comments = await fetchRedditComments(url);
-    } else {
-      return NextResponse.json(
-        { error: "Only Instagram, YouTube and Reddit are supported right now. More platforms coming soon." },
-        { status: 400 }
-      );
+    } else if (platform === "tiktok") {
+      comments = await fetchTikTokComments(url);
+    } else if (platform === "twitter") {
+      comments = await fetchXComments(url);
+    } else if (platform === "facebook") {
+      comments = await fetchFacebookComments(url);
+    } else if (platform === "linkedin") {
+      comments = await fetchLinkedInComments(url);
     }
 
     if (comments.length === 0) {
-      return NextResponse.json(
-        { error: "No comments found for this post." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No comments found for this post." }, { status: 400 });
     }
 
     const commentsText = comments
