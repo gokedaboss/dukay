@@ -96,6 +96,23 @@ async function fetchYouTubeComments(url: string): Promise<string[]> {
     .filter((text): text is string => !!text && text.length > 3);
 }
 
+async function fetchRedditComments(url: string): Promise<string[]> {
+  const run = await apify.actor("trudax/reddit-scraper-lite").call({
+    startUrls: [{ url }],
+    skipComments: false,
+    maxItems: 100,
+  });
+
+  const { items } = await apify.dataset(run.defaultDatasetId).listItems();
+
+  return items
+    .map((item: Record<string, unknown>) => {
+      const text = item.body || item.text || item.comment;
+      return typeof text === "string" ? text.trim() : null;
+    })
+    .filter((text): text is string => !!text && text.length > 3);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { url } = await request.json();
@@ -122,9 +139,11 @@ export async function POST(request: NextRequest) {
       comments = await fetchInstagramComments(url);
     } else if (platform === "youtube") {
       comments = await fetchYouTubeComments(url);
+    } else if (platform === "reddit") {
+      comments = await fetchRedditComments(url);
     } else {
       return NextResponse.json(
-        { error: "Only Instagram and YouTube are supported right now. More platforms coming soon." },
+        { error: "Only Instagram, YouTube and Reddit are supported right now. More platforms coming soon." },
         { status: 400 }
       );
     }
