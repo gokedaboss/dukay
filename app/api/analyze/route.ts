@@ -208,10 +208,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No URL provided" }, { status: 400 });
     }
 
-    const platform = detectPlatform(url);
+   const platform = detectPlatform(url);
 
     if (platform === "unknown") {
       return NextResponse.json({ error: "Unsupported platform" }, { status: 400 });
+    }
+
+    // Check cache first
+    const { data: cached } = await supabase
+      .from("analyses")
+      .select("analysis")
+      .eq("url", url)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (cached?.analysis) {
+      return NextResponse.json({ analysis: cached.analysis, cached: true });
     }
 
     let comments: string[] = [];
