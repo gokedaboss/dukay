@@ -110,8 +110,10 @@ export default function Home() {
   const [loadingMessage, setLoadingMessage] = useState("");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [platform, setPlatform] = useState("");
+  const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<"useful" | "not_useful" | null>(null);
+  const [copied, setCopied] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -155,6 +157,8 @@ export default function Home() {
     setLoading(true);
     setAnalysis(null);
     setFeedback(null);
+    setAnalysisId(null);
+    setCopied(false);
     startLoadingMessages();
 
     try {
@@ -187,6 +191,7 @@ export default function Home() {
 
       setAnalysis(data.analysis);
       setPlatform(data.platform || "");
+      setAnalysisId(data.id || null);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") {
         setError(errorMessages.timeout);
@@ -197,6 +202,14 @@ export default function Home() {
       setLoading(false);
       stopLoadingMessages();
     }
+  };
+
+  const handleShare = async () => {
+    if (!analysisId) return;
+    const shareUrl = `${window.location.origin}/analysis/${analysisId}`;
+    await navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleFeedback = async (rating: "useful" | "not_useful") => {
@@ -212,6 +225,7 @@ export default function Home() {
       // fail silently
     }
   };
+
   const backlashColor =
     analysis?.backlash_verdict === "real"
       ? "bg-red-500/20 text-red-300 border-red-500/30"
@@ -302,7 +316,7 @@ export default function Home() {
       {analysis && (
         <section className="max-w-5xl mx-auto px-6 pb-24 space-y-3">
 
-          {/* 0. Platform Badge */}
+          {/* Platform Badge */}
           {platform && (
             <div className="flex items-center gap-2 pb-1">
               <span className="text-[10px] font-semibold tracking-widest uppercase text-white/30 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
@@ -311,16 +325,20 @@ export default function Home() {
               <span className="text-[10px] text-white/20">Post analyzed</span>
             </div>
           )}
-          {/* 0. Backstory */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-            <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">
-              Backstory
-            </p>
-            <p className="text-white/80 text-base leading-relaxed">
-              {analysis.backstory}
-            </p>
-          </div>
-          {/* 1. Main Takeaway */}
+
+          {/* Backstory */}
+          {analysis.backstory && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">
+                Backstory
+              </p>
+              <p className="text-white/80 text-base leading-relaxed">
+                {analysis.backstory}
+              </p>
+            </div>
+          )}
+
+          {/* Main Takeaway */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
             <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">
               Main Takeaway
@@ -330,7 +348,7 @@ export default function Home() {
             </p>
           </div>
 
-          {/* 2. Backlash + Overall Vibe */}
+          {/* Backlash + Overall Vibe */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
               <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">
@@ -357,7 +375,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 3. Breakdown */}
+          {/* Breakdown */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
             <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-4">
               Breakdown
@@ -378,7 +396,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 4. Representative Comments */}
+          {/* Representative Comments */}
           {analysis.representative_comments && analysis.representative_comments.length > 0 && (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
               <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-4">
@@ -396,7 +414,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* 5. Pro Section */}
+          {/* Pro Section */}
           <div className="relative rounded-2xl overflow-hidden">
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -421,7 +439,6 @@ export default function Home() {
                 </ul>
               </div>
             </div>
-
             <div className="absolute inset-0 backdrop-blur-md bg-[#111111]/70 flex flex-col items-center justify-center gap-2 rounded-2xl py-8">
               <span className="text-2xl">🔒</span>
               <p className="text-white font-bold text-base">Dükay Pro</p>
@@ -434,8 +451,20 @@ export default function Home() {
             </div>
           </div>
 
-        {/* Feedback */}
-          <div className="flex flex-col items-center gap-3 pt-4 pb-2">
+          {/* Share */}
+          {analysisId && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/15 text-xs font-bold text-white/50 hover:border-[#FF6B00]/50 hover:text-[#FF6B00] transition"
+              >
+                {copied ? "✓ Link copied!" : "Share this analysis"}
+              </button>
+            </div>
+          )}
+
+          {/* Feedback */}
+          <div className="flex flex-col items-center gap-3 pt-2 pb-2">
             <p className="text-xs text-white/30">Was this analysis useful?</p>
             <div className="flex gap-3">
               <button
@@ -471,6 +500,7 @@ export default function Home() {
               </p>
             )}
           </div>
+
         </section>
       )}
     </main>

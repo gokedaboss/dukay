@@ -307,19 +307,25 @@ export async function POST(request: NextRequest) {
     const analysis = JSON.parse(cleaned);
 
     // Save to Supabase
+    let analysisId = null;
     try {
-      await supabase.from("analyses").insert({
-        url,
-        platform,
-        comments: comments.slice(0, 300),
-        analysis,
-        prompt_version: PROMPT_VERSION,
-      });
+      const { data: saved } = await supabase
+        .from("analyses")
+        .insert({
+          url,
+          platform,
+          comments: comments.slice(0, 300),
+          analysis,
+          prompt_version: PROMPT_VERSION,
+        })
+        .select("id")
+        .single();
+      analysisId = saved?.id;
     } catch (dbError) {
       console.error("DB save error:", dbError);
     }
 
-    return NextResponse.json({ analysis, platform: platformLabel });
+    return NextResponse.json({ analysis, platform: platformLabel, id: analysisId });
   } catch (error) {
     console.error("Analysis error:", error);
     return NextResponse.json(
