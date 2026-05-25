@@ -3,8 +3,6 @@ import { ApifyClient } from "apify-client";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const PROMPT_VERSION = "1.0";
-
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -17,6 +15,8 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+const PROMPT_VERSION = "1.1";
 
 const DUKAY_PROMPT = `You are Dükay — a sharp, culturally aware comment reader.
 
@@ -52,6 +52,7 @@ But explain all of it plainly.
 Return your analysis in this exact JSON format and nothing else — no preamble, no markdown, just raw JSON:
 
 {
+  "backstory": "1-2 sentences max. Infer what the original post was probably about based only on what commenters are clearly referencing. Use soft language like 'Commenters appear to be reacting to...' or 'Based on the comments, this seems to be about...'. Never invent details. If nothing clear can be inferred, say so honestly in one sentence.",
   "main_takeaway": "One sharp sentence that captures what is actually happening in the comment section. Should feel like something a smart person would say after reading everything. Plain language only. Maximum 20 words.",
   "agreement": "What most people agree on — include WHAT they think and WHY. Write it like you are explaining it to a friend.",
   "disagreement": "What people are genuinely divided on — include WHAT and WHY. If there is no real disagreement, say so plainly.",
@@ -97,7 +98,10 @@ Rules:
 - Vibe percentages must be whole numbers that sum to 100
 - Analyze in the original language but output everything in English
 - Interpret tone within the cultural context of the comments
-- Write like a sharp human, never like a corporate AI`;
+- Write like a sharp human, never like a corporate AI
+- backstory must be 1-2 sentences maximum
+- backstory must only reference what commenters clearly mention — never invent post content
+- backstory must use soft inferential language, never confident assertions about the original post`;
 
 function detectPlatform(url: string): string {
   if (url.includes("instagram.com")) return "instagram";

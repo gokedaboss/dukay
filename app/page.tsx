@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 type BacklashVerdict = "real" | "mixed" | "noise";
 
 type AnalysisResult = {
+  backstory: string;
   main_takeaway: string;
   agreement: string;
   disagreement: string;
@@ -295,6 +296,15 @@ export default function Home() {
               <span className="text-[10px] text-white/20">Post analyzed</span>
             </div>
           )}
+          {/* 0. Backstory */}
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+            <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">
+              Backstory
+            </p>
+            <p className="text-white/80 text-base leading-relaxed">
+              {analysis.backstory}
+            </p>
+          </div>
           {/* 1. Main Takeaway */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
             <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">
