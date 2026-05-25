@@ -111,6 +111,7 @@ export default function Home() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [platform, setPlatform] = useState("");
   const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState<"useful" | "not_useful" | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -153,6 +154,7 @@ export default function Home() {
     setError("");
     setLoading(true);
     setAnalysis(null);
+    setFeedback(null);
     startLoadingMessages();
 
     try {
@@ -197,6 +199,19 @@ export default function Home() {
     }
   };
 
+  const handleFeedback = async (rating: "useful" | "not_useful") => {
+    if (feedback) return;
+    setFeedback(rating);
+    try {
+      await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, platform, rating }),
+      });
+    } catch {
+      // fail silently
+    }
+  };
   const backlashColor =
     analysis?.backlash_verdict === "real"
       ? "bg-red-500/20 text-red-300 border-red-500/30"
@@ -419,6 +434,43 @@ export default function Home() {
             </div>
           </div>
 
+        {/* Feedback */}
+          <div className="flex flex-col items-center gap-3 pt-4 pb-2">
+            <p className="text-xs text-white/30">Was this analysis useful?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleFeedback("useful")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold transition ${
+                  feedback === "useful"
+                    ? "bg-green-500/20 border-green-500/40 text-green-300"
+                    : feedback
+                    ? "opacity-30 border-white/10 text-white/30"
+                    : "border-white/15 text-white/50 hover:border-white/30 hover:text-white/70"
+                }`}
+                disabled={!!feedback}
+              >
+                👍 Useful
+              </button>
+              <button
+                onClick={() => handleFeedback("not_useful")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold transition ${
+                  feedback === "not_useful"
+                    ? "bg-red-500/20 border-red-500/40 text-red-300"
+                    : feedback
+                    ? "opacity-30 border-white/10 text-white/30"
+                    : "border-white/15 text-white/50 hover:border-white/30 hover:text-white/70"
+                }`}
+                disabled={!!feedback}
+              >
+                👎 Not useful
+              </button>
+            </div>
+            {feedback && (
+              <p className="text-xs text-white/30">
+                {feedback === "useful" ? "Thanks — glad it helped." : "Thanks — we'll keep improving."}
+              </p>
+            )}
+          </div>
         </section>
       )}
     </main>
