@@ -1,3 +1,9 @@
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 import Anthropic from "@anthropic-ai/sdk";
 import { ApifyClient } from "apify-client";
 import { NextRequest, NextResponse } from "next/server";
@@ -259,6 +265,19 @@ export async function POST(request: NextRequest) {
       .trim();
 
     const analysis = JSON.parse(cleaned);
+
+   // Save to Supabase
+    try {
+      await supabase.from("analyses").insert({
+        url,
+        platform,
+        comments: comments.slice(0, 300),
+        analysis,
+      });
+    } catch (dbError) {
+      console.error("DB save error:", dbError);
+      // Don't fail the request if DB save fails
+    }
 
     return NextResponse.json({ analysis });
   } catch (error) {
