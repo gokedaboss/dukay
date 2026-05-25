@@ -104,6 +104,126 @@ function isSupportedUrl(input: string) {
   }
 }
 
+function QAPanel({ analysisId }: { analysisId: string }) {
+  const [qaQuestion, setQaQuestion] = useState("");
+  const [qaAnswer, setQaAnswer] = useState("");
+  const [qaLoading, setQaLoading] = useState(false);
+  const [qaError, setQaError] = useState("");
+  const [qaUsed, setQaUsed] = useState(false);
+
+  const presetQuestions = [
+    "Why are people mad?",
+    "What's the strongest defense?",
+    "What joke keeps repeating?",
+  ];
+
+  const handleQa = async (question: string) => {
+    if (!analysisId || qaLoading) return;
+    setQaLoading(true);
+    setQaError("");
+    setQaAnswer("");
+    setQaQuestion(question);
+
+    try {
+      const res = await fetch("/api/qa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ analysisId, question }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setQaError("Couldn't get an answer. Try again.");
+      } else {
+        setQaAnswer(data.answer);
+        setQaUsed(true);
+      }
+    } catch {
+      setQaError("Something went wrong.");
+    } finally {
+      setQaLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5">
+      <div>
+        <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-1">
+          Ask the comments
+        </p>
+        <p className="text-white/40 text-xs">Ask anything about what people are really saying.</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {presetQuestions.map((q) => (
+          <button
+            key={q}
+            onClick={() => !qaUsed && handleQa(q)}
+            disabled={qaLoading || qaUsed}
+            className={`text-xs px-3 py-1.5 rounded-xl border font-medium transition ${
+              qaQuestion === q && (qaLoading || !!qaAnswer)
+                ? "border-[#FF6B00]/50 text-[#FF6B00] bg-[#FF6B00]/10"
+                : "border-white/15 text-white/50 hover:border-white/30 hover:text-white/70"
+            } disabled:cursor-not-allowed disabled:opacity-40`}
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+
+      {!qaUsed && (
+        <div className="relative">
+          <input
+            type="text"
+            value={qaQuestion}
+            onChange={(e) => setQaQuestion(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && qaQuestion.trim()) handleQa(qaQuestion.trim());
+            }}
+            placeholder="Or ask your own question…"
+            className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-[#FF6B00]/50 pr-20 transition"
+          />
+          <button
+            onClick={() => qaQuestion.trim() && handleQa(qaQuestion.trim())}
+            disabled={!qaQuestion.trim() || qaLoading}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#FF6B00] text-black text-xs font-bold px-3 py-1.5 rounded-lg hover:opacity-80 disabled:opacity-40 transition"
+          >
+            Ask
+          </button>
+        </div>
+      )}
+
+      {qaLoading && (
+        <div className="flex items-center gap-3">
+          <div className="w-4 h-4 border-2 border-[#FF6B00]/30 border-t-[#FF6B00] rounded-full animate-spin" />
+          <p className="text-xs text-white/40">Reading the comments…</p>
+        </div>
+      )}
+
+      {qaAnswer && (
+        <div className="border-l-2 border-[#FF6B00]/40 pl-4">
+          <p className="text-white/80 text-sm leading-relaxed">{qaAnswer}</p>
+        </div>
+      )}
+
+      {qaError && (
+        <p className="text-xs text-red-300">{qaError}</p>
+      )}
+
+      {qaUsed && (
+        <div className="border border-white/10 rounded-xl p-4 flex flex-col items-center gap-2 text-center">
+          <p className="text-white/60 text-xs leading-relaxed">
+            Unlock unlimited follow-up questions with{" "}
+            <span className="text-white font-bold">Dükay Pro</span>.
+          </p>
+          <button className="bg-[#FF6B00] text-black text-xs font-bold px-5 py-2 rounded-xl hover:opacity-80 transition">
+            Unlock Pro
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -414,42 +534,8 @@ export default function Home() {
             </div>
           )}
 
-          {/* Pro Section */}
-          <div className="relative rounded-2xl overflow-hidden">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-2">Agreement</p>
-                  <p className="text-white/70 text-sm leading-relaxed">{analysis.agreement}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-2">Disagreement</p>
-                  <p className="text-white/70 text-sm leading-relaxed">{analysis.disagreement}</p>
-                </div>
-              </div>
-              <div className="mt-6 pt-5 border-t border-white/10">
-                <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">Non-Obvious Insights</p>
-                <ul className="space-y-2 text-white/70 text-sm leading-relaxed">
-                  {analysis.non_obvious_insights.map((insight, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="text-white/20 shrink-0">0{i + 1}</span>
-                      {insight}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            <div className="absolute inset-0 backdrop-blur-md bg-[#111111]/70 flex flex-col items-center justify-center gap-2 rounded-2xl py-8">
-              <span className="text-2xl">🔒</span>
-              <p className="text-white font-bold text-base">Dükay Pro</p>
-              <p className="text-white/40 text-xs text-center px-10 leading-relaxed max-w-xs">
-                Agreement, disagreement, non-obvious insights, comment patterns and Q&A.
-              </p>
-              <button className="mt-3 bg-[#FF6B00] text-black text-xs font-bold px-5 py-2 rounded-xl hover:opacity-80 transition">
-                Unlock Pro
-              </button>
-            </div>
-          </div>
+          {/* Pro Q&A */}
+          {analysisId && <QAPanel analysisId={analysisId} />}
 
           {/* Share */}
           {analysisId && (
