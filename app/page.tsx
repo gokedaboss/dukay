@@ -12,6 +12,8 @@ type AnalysisResult = {
   backlash_reasoning: string;
   non_obvious_insights: string[];
   comment_patterns: string[];
+  representative_comments: string[];
+  comments_section_label: string;
   overall_vibe: string;
   vibe_breakdown: {
     funny: number;
@@ -87,6 +89,7 @@ const errorMessages: Record<string, string> = {
   unsupported: "This link isn't supported yet. Try Instagram, TikTok, YouTube, X, Facebook, Reddit or LinkedIn.",
   private: "We couldn't read comments from this post. It may be private or restricted.",
   no_comments: "No comments found for this post. It may be too new or have comments disabled.",
+  x_restricted: "X restricts comment access on most posts. Try Instagram, YouTube or Reddit for best results.",
   timeout: "This took too long. The post may have too many restrictions. Try another link.",
   default: "Something went wrong analyzing this post. Please try again.",
 };
@@ -105,6 +108,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [platform, setPlatform] = useState("");
   const [error, setError] = useState("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -165,7 +169,10 @@ export default function Home() {
       const data = await response.json();
 
       if (data.error) {
-        if (data.error.includes("private") || data.error.includes("restricted")) {
+        const isX = trimmedUrl.includes("x.com") || trimmedUrl.includes("twitter.com");
+        if (isX && data.error.includes("No comments")) {
+          setError(errorMessages.x_restricted);
+        } else if (data.error.includes("private") || data.error.includes("restricted")) {
           setError(errorMessages.private);
         } else if (data.error.includes("No comments")) {
           setError(errorMessages.no_comments);
@@ -176,6 +183,7 @@ export default function Home() {
       }
 
       setAnalysis(data.analysis);
+      setPlatform(data.platform || "");
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") {
         setError(errorMessages.timeout);
@@ -278,6 +286,15 @@ export default function Home() {
       {analysis && (
         <section className="max-w-5xl mx-auto px-6 pb-24 space-y-3">
 
+          {/* 0. Platform Badge */}
+          {platform && (
+            <div className="flex items-center gap-2 pb-1">
+              <span className="text-[10px] font-semibold tracking-widest uppercase text-white/30 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
+                {platform}
+              </span>
+              <span className="text-[10px] text-white/20">Post analyzed</span>
+            </div>
+          )}
           {/* 1. Main Takeaway */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
             <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">
@@ -324,9 +341,9 @@ export default function Home() {
               {Object.entries(analysis.vibe_breakdown).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-3">
                   <span className="text-xs font-bold text-white/50 uppercase w-16 shrink-0">{key}</span>
-                  <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div className="flex-1 h-2.5 bg-white/15 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#FF6B00] rounded-full transition-all duration-700"
+                      className="h-full bg-[#FF6B00] rounded-full transition-all duration-1000"
                       style={{ width: `${value}%` }}
                     />
                   </div>
@@ -336,7 +353,25 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 4. Pro Section */}
+          {/* 4. Representative Comments */}
+          {analysis.representative_comments && analysis.representative_comments.length > 0 && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+              <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-4">
+                {analysis.comments_section_label || "What people kept saying"}
+              </p>
+              <div className="space-y-3">
+                {analysis.representative_comments.slice(0, 2).map((comment, i) => (
+                  <div key={i} className="border-l-2 border-[#FF6B00]/40 pl-4">
+                    <p className="text-white/70 text-sm leading-relaxed italic">
+                      "{comment}"
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 5. Pro Section */}
           <div className="relative rounded-2xl overflow-hidden">
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
