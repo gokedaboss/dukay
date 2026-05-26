@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { auth } from "@clerk/nextjs/server";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -9,12 +10,59 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+const FREE_QA_LIMIT = 2;
+
 export async function POST(request: NextRequest) {
   try {
-    const { analysisId, question } = await request.json();
+    const { analysisId, question, sessionId } = await request.json();
 
     if (!analysisId || !question) {
       return NextResponse.json({ error: "Missing analysisId or question" }, { status: 400 });
+    }
+
+    const { userId } = await auth();
+    let isPro = false;
+
+    if (userId) {
+      const { data: proUser } = await supabase
+        .from("pro_users")
+        .select("is_pro")
+        .eq("clerk_user_id", userId)
+        .single();
+      isPro = proUser?.is_pro === true;
+    }
+
+    if (!isPro) {
+      if (!sessionId) {
+        return NextResponse.json({ error: "Missing session" }, { status: 400 });
+      }
+
+      const { data: qaUsage } = await supabase
+        .from("qa_usage")
+        .select("count")
+        .eq("session_id", sessionId)
+        .eq("analysis_id", analysisId)
+        .single();
+
+      const currentCount = qaUsage?.count ?? 0;
+
+      if (currentCount >= FREE_QA_LIMIT) {
+        return NextResponse.json({ error: "free_limit_reached" }, { status: 403 });
+      }
+
+      const { error: upsertError } = await supabase.from("qa_usage").upsert(
+        {
+          session_id: sessionId,
+          analysis_id: analysisId,
+          count: currentCount + 1,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "session_id,analysis_id" }
+      );
+
+      if (upsertError) {
+        console.error("qa_usage upsert error:", upsertError);
+      }
     }
 
     const { data } = await supabase

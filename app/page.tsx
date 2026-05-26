@@ -117,6 +117,15 @@ function QAPanel({ analysisId }: { analysisId: string }) {
     "What joke keeps repeating?",
   ];
 
+  const getSessionId = () => {
+    let sessionId = localStorage.getItem("dukay_session");
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      localStorage.setItem("dukay_session", sessionId);
+    }
+    return sessionId;
+  };
+
   const handleQa = async (question: string) => {
     if (!analysisId || qaLoading) return;
     setQaLoading(true);
@@ -128,10 +137,12 @@ function QAPanel({ analysisId }: { analysisId: string }) {
       const res = await fetch("/api/qa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ analysisId, question }),
+        body: JSON.stringify({ analysisId, question, sessionId: getSessionId() }),
       });
       const data = await res.json();
-      if (data.error) {
+      if (data.error === "free_limit_reached") {
+        setQaError("free_limit_reached");
+      } else if (data.error) {
         setQaError("Couldn't get an answer. Try again.");
       } else {
         setQaAnswer(data.answer);
@@ -141,6 +152,17 @@ function QAPanel({ analysisId }: { analysisId: string }) {
       setQaError("Something went wrong.");
     } finally {
       setQaLoading(false);
+    }
+  };
+
+  const handleUnlockPro = async () => {
+    const res = await fetch("/api/stripe/checkout", { method: "POST" });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else if (data.error === "Not signed in") {
+      localStorage.setItem("dukay_pending_checkout", "true");
+      window.location.href = "/sign-in";
     }
   };
 
@@ -157,8 +179,8 @@ function QAPanel({ analysisId }: { analysisId: string }) {
         {presetQuestions.map((q) => (
           <button
             key={q}
-            onClick={() => !qaUsed && handleQa(q)}
-            disabled={qaLoading || qaUsed}
+            onClick={() => handleQa(q)}
+            disabled={qaLoading}
             className={`text-xs px-3 py-1.5 rounded-xl border font-medium transition ${
               qaQuestion === q && (qaLoading || !!qaAnswer)
                 ? "border-[#FF6B00]/50 text-[#FF6B00] bg-[#FF6B00]/10"
@@ -170,7 +192,7 @@ function QAPanel({ analysisId }: { analysisId: string }) {
         ))}
       </div>
 
-      {!qaUsed && (
+      {qaError !== "free_limit_reached" && (
         <div className="relative">
           <input
             type="text"
@@ -205,17 +227,16 @@ function QAPanel({ analysisId }: { analysisId: string }) {
         </div>
       )}
 
-      {qaError && (
-        <p className="text-xs text-red-300">{qaError}</p>
-      )}
-
-      {qaUsed && (
+      {(qaUsed || qaError === "free_limit_reached") && (
         <div className="border border-white/10 rounded-xl p-4 flex flex-col items-center gap-2 text-center">
           <p className="text-white/60 text-xs leading-relaxed">
             Unlock unlimited follow-up questions with{" "}
             <span className="text-white font-bold">Dükay Pro</span>.
           </p>
-          <button className="bg-[#FF6B00] text-black text-xs font-bold px-5 py-2 rounded-xl hover:opacity-80 transition">
+          <button
+            onClick={handleUnlockPro}
+            className="bg-[#FF6B00] text-black text-xs font-bold px-5 py-2 rounded-xl hover:opacity-80 transition"
+          >
             Unlock Pro
           </button>
         </div>
@@ -240,6 +261,18 @@ export default function Home() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    const pending = localStorage.getItem("dukay_pending_checkout");
+    if (pending) {
+      localStorage.removeItem("dukay_pending_checkout");
+      fetch("/api/stripe/checkout", { method: "POST" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.url) window.location.href = data.url;
+        });
+    }
   }, []);
 
   const startLoadingMessages = () => {
@@ -519,7 +552,7 @@ export default function Home() {
           {/* Representative Comments */}
           {analysis.representative_comments && analysis.representative_comments.length > 0 && (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-              <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-4">
+              <p className="text-[10px] font-semibold tracking-widests uppercase text-white/40 mb-4">
                 {analysis.comments_section_label || "What people kept saying"}
               </p>
               <div className="space-y-3">

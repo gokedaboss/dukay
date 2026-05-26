@@ -244,15 +244,15 @@ export async function POST(request: NextRequest) {
     // Check cache first
     const { data: cached } = await supabase
       .from("analyses")
-      .select("analysis, prompt_version")
+      .select("id, analysis, prompt_version")
       .eq("url", url)
       .order("created_at", { ascending: false })
       .limit(1)
       .single();
 
     if (cached?.analysis && cached?.prompt_version === PROMPT_VERSION) {
-      return NextResponse.json({ analysis: cached.analysis, platform: platformLabel, cached: true });
-    }
+  return NextResponse.json({ analysis: cached.analysis, platform: platformLabel, cached: true, id: cached.id });
+}
 
     let comments: string[] = [];
 
