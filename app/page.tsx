@@ -68,23 +68,29 @@ const platformIcons = [
   },
 ];
 
-const loadingMessages = [
+// Messages grouped by pipeline stage — rotate within each stage
+// Stage 1: Apify is fetching comments (~18s)
+const FETCH_MESSAGES = [
   "Fetching comments…",
-  "Filtering out the noise…",
-  "Finding repeated patterns…",
+  "Loading the comment section…",
+  "Pulling in what people said…",
+  "Grabbing the conversation…",
+  "Reaching into the comments…",
+];
+
+// Stage 2: Claude is analyzing (~8s)
+const ANALYZE_MESSAGES = [
+  "Reading the room…",
+  "Figuring out who's actually angry…",
   "Separating jokes from real criticism…",
   "Checking if the backlash is real or just loud…",
-  "Reading the vibe of the conversation…",
-  "Identifying what people actually agree on…",
-  "Looking for what most people missed…",
-  "Checking if the criticism has substance…",
-  "Reading between the lines…",
-  "Figuring out who is actually angry and who is just loud…",
-  "Almost there…",
-  "Sorting through the chaos…",
   "Finding the signal in the noise…",
-  "Working it out…",
+  "Looking for what most people missed…",
+  "Almost there…",
 ];
+
+// How long to stay in fetch stage before switching to analyze stage
+const FETCH_STAGE_DURATION = 18000;
 
 const errorMessages: Record<string, string> = {
   unsupported: "This link isn't supported yet. Try Instagram, TikTok, YouTube, X, Facebook, Reddit or LinkedIn.",
@@ -229,15 +235,15 @@ function QAPanel({ analysisId }: { analysisId: string }) {
 
       {(qaUsed || qaError === "free_limit_reached") && (
         <div className="border border-white/10 rounded-xl p-4 flex flex-col items-center gap-2 text-center">
-          <p className="text-white/60 text-xs leading-relaxed">
-            Unlock unlimited follow-up questions with{" "}
-            <span className="text-white font-bold">Dükay Pro</span>.
+          <p className="text-white font-bold text-sm mb-0.5">Want the full picture?</p>
+          <p className="text-white/50 text-xs leading-relaxed">
+            Deep Dive analyzes broader patterns, reply chains, and lets you ask unlimited questions.
           </p>
           <button
             onClick={handleUnlockPro}
             className="bg-[#FF6B00] text-black text-xs font-bold px-5 py-2 rounded-xl hover:opacity-80 transition"
           >
-            Unlock Pro
+            Get the Deep Dive — $9/mo
           </button>
         </div>
       )}
@@ -249,17 +255,18 @@ export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
+  const [loadingStage, setLoadingStage] = useState<"fetch" | "analyze">("fetch");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [platform, setPlatform] = useState("");
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<"useful" | "not_useful" | null>(null);
   const [copied, setCopied] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stepTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (stepTimeoutRef.current) clearTimeout(stepTimeoutRef.current);
     };
   }, []);
 
@@ -275,22 +282,45 @@ export default function Home() {
     }
   }, []);
 
-  const startLoadingMessages = () => {
-    const shuffled = [...loadingMessages].sort(() => Math.random() - 0.5);
+  // Rotate messages within the current stage, then switch to analyze stage
+  const startProgressSteps = () => {
+    setLoadingStage("fetch");
+
+    let stage: "fetch" | "analyze" = "fetch";
     let index = 0;
-    setLoadingMessage(shuffled[0]);
-    intervalRef.current = setInterval(() => {
-      index = (index + 1) % shuffled.length;
-      setLoadingMessage(shuffled[index]);
-    }, 3000);
+
+    const getMessages = () => stage === "fetch" ? FETCH_MESSAGES : ANALYZE_MESSAGES;
+
+    // Shuffle fetch messages for variety
+    const shuffledFetch = [...FETCH_MESSAGES].sort(() => Math.random() - 0.5);
+    const shuffledAnalyze = [...ANALYZE_MESSAGES].sort(() => Math.random() - 0.5);
+    const getShuffled = () => stage === "fetch" ? shuffledFetch : shuffledAnalyze;
+
+    setLoadingMessage(shuffledFetch[0]);
+
+    const rotate = () => {
+      index = (index + 1) % getShuffled().length;
+      setLoadingMessage(getShuffled()[index]);
+      stepTimeoutRef.current = setTimeout(rotate, 3000);
+    };
+
+    // Switch to analyze stage after fetch duration
+    stepTimeoutRef.current = setTimeout(() => {
+      stage = "analyze";
+      index = 0;
+      setLoadingStage("analyze");
+      setLoadingMessage(shuffledAnalyze[0]);
+      stepTimeoutRef.current = setTimeout(rotate, 3000);
+    }, FETCH_STAGE_DURATION);
   };
 
-  const stopLoadingMessages = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  const stopProgressSteps = () => {
+    if (stepTimeoutRef.current) {
+      clearTimeout(stepTimeoutRef.current);
+      stepTimeoutRef.current = null;
     }
     setLoadingMessage("");
+    setLoadingStage("fetch");
   };
 
   const handleAnalyze = async () => {
@@ -312,7 +342,7 @@ export default function Home() {
     setFeedback(null);
     setAnalysisId(null);
     setCopied(false);
-    startLoadingMessages();
+    startProgressSteps();
 
     try {
       const controller = new AbortController();
@@ -353,7 +383,7 @@ export default function Home() {
       }
     } finally {
       setLoading(false);
-      stopLoadingMessages();
+      stopProgressSteps();
     }
   };
 
@@ -457,11 +487,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Loading */}
+      {/* Loading — stage-aware rotating messages */}
       {loading && (
         <div className="flex flex-col justify-center items-center py-16 gap-4">
           <div className="w-6 h-6 border-2 border-[#FF6B00]/30 border-t-[#FF6B00] rounded-full animate-spin" />
+          <p className="text-[10px] font-semibold tracking-widest uppercase text-[#FF6B00]/50 mb-0">
+            Quick Snapshot
+          </p>
           <p className="text-sm text-white/40 animate-pulse">{loadingMessage}</p>
+          <div className="flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full transition-all duration-700 ${loadingStage === "fetch" ? "bg-[#FF6B00]" : "bg-[#FF6B00]/40"}`} />
+            <div className={`w-1.5 h-1.5 rounded-full transition-all duration-700 ${loadingStage === "analyze" ? "bg-[#FF6B00]" : "bg-white/20"}`} />
+          </div>
         </div>
       )}
 
@@ -469,13 +506,16 @@ export default function Home() {
       {analysis && (
         <section className="max-w-5xl mx-auto px-6 pb-24 space-y-3">
 
-          {/* Platform Badge */}
+          {/* Platform Badge + Snapshot Label */}
           {platform && (
             <div className="flex items-center gap-2 pb-1">
               <span className="text-[10px] font-semibold tracking-widest uppercase text-white/30 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
                 {platform}
               </span>
-              <span className="text-[10px] text-white/20">Post analyzed</span>
+              <span className="text-[10px] text-white/20">·</span>
+              <span className="text-[10px] font-semibold tracking-widest uppercase text-[#FF6B00]/60 bg-[#FF6B00]/5 border border-[#FF6B00]/15 px-3 py-1 rounded-full">
+                Quick Snapshot
+              </span>
             </div>
           )}
 
@@ -493,7 +533,7 @@ export default function Home() {
 
           {/* Main Takeaway */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-            <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">
+            <p className="text-[10px] font-semibold tracking-widests uppercase text-white/40 mb-3">
               Main Takeaway
             </p>
             <p className="text-white font-black text-2xl md:text-3xl leading-snug tracking-tight">
@@ -504,7 +544,7 @@ export default function Home() {
           {/* Backlash + Overall Vibe */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-              <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">
+              <p className="text-[10px] font-semibold tracking-widests uppercase text-white/40 mb-3">
                 Backlash
               </p>
               <span className={`text-xs font-black px-3 py-1 rounded-full border ${backlashColor}`}>
@@ -516,7 +556,7 @@ export default function Home() {
             </div>
 
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-              <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-3">
+              <p className="text-[10px] font-semibold tracking-widests uppercase text-white/40 mb-3">
                 Overall Vibe
               </p>
               <p className="text-white font-bold text-base leading-snug">
@@ -530,7 +570,7 @@ export default function Home() {
 
           {/* Breakdown */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-            <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-4">
+            <p className="text-[10px] font-semibold tracking-widests uppercase text-white/40 mb-4">
               Breakdown
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
