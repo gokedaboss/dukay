@@ -95,7 +95,7 @@ const FETCH_STAGE_DURATION = 18000;
 const errorMessages: Record<string, string> = {
   unsupported: "This link isn't supported yet. Try Instagram, TikTok, YouTube, X, Facebook, Reddit or LinkedIn.",
   private: "We couldn't read comments from this post. It may be private or restricted.",
-  no_comments: "No comments found for this post. It may be too new or have comments disabled.",
+  no_comments: "We couldn't read the comments on this post. It may be restricted, private, or the platform blocked access.",
   x_restricted: "X restricts comment access on most posts. Try Instagram, YouTube or Reddit for best results.",
   timeout: "This took too long. The post may have too many restrictions. Try another link.",
   default: "Something went wrong analyzing this post. Please try again.",
@@ -462,7 +462,7 @@ export default function Home() {
           <span className="text-white/60">are really saying</span>
         </h1>
         <p className="text-white/50 text-base font-light max-w-lg mx-auto mb-8 leading-relaxed">
-          Know if the backlash is real, mixed, or just noise — in seconds.
+          The comments don't lie. Stop scrolling and find out what they're really saying.
         </p>
 
         <div className="relative w-full max-w-2xl mx-auto mb-3">
