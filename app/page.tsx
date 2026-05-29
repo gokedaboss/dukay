@@ -460,6 +460,12 @@ export default function Home() {
           >
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
+          <a
+            href="/sign-in"
+            className="text-xs font-semibold text-white/50 hover:text-white/80 transition px-2"
+          >
+            Sign in
+          </a>
           <button className="bg-[#FF6B00] text-black text-xs font-bold px-4 py-2 rounded-lg hover:opacity-80 transition">
             Analyze Free
           </button>
