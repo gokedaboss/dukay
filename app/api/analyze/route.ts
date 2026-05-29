@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ApifyClient } from "apify-client";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { auth } from "@clerk/nextjs/server";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -169,6 +170,19 @@ Rules:
 - backstory must only reference what commenters clearly mention — never invent post content
 - backstory must use soft inferential language, never confident assertions about the original post`;
 
+// Pro Deep Dive — extends the base prompt with 3 additional fields
+const PRO_EXTENSION = `
+
+This is a Deep Dive analysis. In addition to the standard JSON fields above, also include these three extra fields in your JSON response:
+
+"confidence_score": "High confidence, Medium confidence, or Low confidence only — never a number or percentage. Follow with one plain sentence explaining why. Example: 'High confidence — the same arguments appeared consistently across hundreds of comments.'",
+
+"deep_disagreement": "Go deeper than the standard disagreement field. Map out the two or three distinct camps in the comments — who they are, what they believe, and why they won't agree. Be specific. 3-4 sentences.",
+
+"minority_opinion": "The view held by a small but vocal group that the majority is ignoring or dismissing. Why are they saying it? Is there any merit to it? 2-3 sentences. If no clear minority opinion exists, say so plainly."
+
+These three fields must appear at the end of the JSON object, after vibe_interpretation.`;
+
 function detectPlatform(url: string): string {
   if (url.includes("instagram.com")) return "instagram";
   if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
@@ -306,7 +320,7 @@ async function fetchLinkedInComments(url: string, limit: number): Promise<string
 
 export async function POST(request: NextRequest) {
   try {
-    const { url, isPro } = await request.json();
+    const { url } = await request.json();
 
     if (!url) {
       return NextResponse.json({ error: "No URL provided" }, { status: 400 });
@@ -319,10 +333,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unsupported platform" }, { status: 400 });
     }
 
+    // Verify Pro status server-side — never trust the frontend
+    const { userId } = await auth();
+    let isPro = false;
+    if (userId) {
+      const { data: proUser } = await supabase
+        .from("pro_users")
+        .select("is_pro")
+        .eq("clerk_user_id", userId)
+        .single();
+      isPro = proUser?.is_pro === true;
+    }
+
     // Check cache first — return instantly if already analyzed
     const { data: cached } = await supabase
       .from("analyses")
-      .select("id, analysis, prompt_version")
+      .select("id, analysis, prompt_version, is_pro")
       .eq("url", url)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -334,6 +360,7 @@ export async function POST(request: NextRequest) {
         platform: platformLabel,
         cached: true,
         id: cached.id,
+        isPro: cached.is_pro ?? false,
       });
     }
 
@@ -374,13 +401,18 @@ export async function POST(request: NextRequest) {
       .map((c: string, i: number) => `${i + 1}. ${c}`)
       .join("\n");
 
+    // Pro gets the extended prompt with 3 extra deep dive fields
+    const prompt = isPro
+      ? `${DUKAY_PROMPT}${PRO_EXTENSION}\n\nHere are the comments to analyze:\n\n${commentsText}`
+      : `${DUKAY_PROMPT}\n\nHere are the comments to analyze:\n\n${commentsText}`;
+
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1024,
+      max_tokens: isPro ? 1800 : 1024,
       messages: [
         {
           role: "user",
-          content: `${DUKAY_PROMPT}\n\nHere are the comments to analyze:\n\n${commentsText}`,
+          content: prompt,
         },
       ],
     });
@@ -407,6 +439,7 @@ export async function POST(request: NextRequest) {
           comments: commentsToAnalyze,
           analysis,
           prompt_version: PROMPT_VERSION,
+          is_pro: isPro,
         })
         .select("id")
         .single();
@@ -415,7 +448,7 @@ export async function POST(request: NextRequest) {
       console.error("DB save error:", dbError);
     }
 
-    return NextResponse.json({ analysis, platform: platformLabel, id: analysisId });
+    return NextResponse.json({ analysis, platform: platformLabel, id: analysisId, isPro });
   } catch (error) {
     console.error("Analysis error:", error);
     return NextResponse.json(

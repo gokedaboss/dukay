@@ -23,6 +23,10 @@ type AnalysisResult = {
     opposing: number;
   };
   vibe_interpretation: string;
+  // Pro Deep Dive fields
+  confidence_score?: string;
+  deep_disagreement?: string;
+  minority_opinion?: string;
 };
 
 const supportedPlatforms = [
@@ -95,7 +99,7 @@ const FETCH_STAGE_DURATION = 18000;
 const errorMessages: Record<string, string> = {
   unsupported: "This link isn't supported yet. Try Instagram, TikTok, YouTube, X, Facebook, Reddit or LinkedIn.",
   private: "We couldn't read comments from this post. It may be private or restricted.",
-  no_comments: "We couldn't read the comments on this post. It may be restricted, private, or the platform blocked access.",
+  no_comments: "No comments found for this post. It may be too new or have comments disabled.",
   x_restricted: "X restricts comment access on most posts. Try Instagram, YouTube or Reddit for best results.",
   timeout: "This took too long. The post may have too many restrictions. Try another link.",
   default: "Something went wrong analyzing this post. Please try again.",
@@ -110,7 +114,7 @@ function isSupportedUrl(input: string) {
   }
 }
 
-function QAPanel({ analysisId }: { analysisId: string }) {
+function QAPanel({ analysisId, isPro }: { analysisId: string; isPro: boolean }) {
   const [qaQuestion, setQaQuestion] = useState("");
   const [qaAnswer, setQaAnswer] = useState("");
   const [qaLoading, setQaLoading] = useState(false);
@@ -233,7 +237,7 @@ function QAPanel({ analysisId }: { analysisId: string }) {
         </div>
       )}
 
-      {(qaUsed || qaError === "free_limit_reached") && (
+      {!isPro && (qaUsed || qaError === "free_limit_reached") && (
         <div className="border border-white/10 rounded-xl p-4 flex flex-col items-center gap-2 text-center">
           <p className="text-white font-bold text-sm mb-0.5">Want the full picture?</p>
           <p className="text-white/50 text-xs leading-relaxed">
@@ -253,6 +257,7 @@ function QAPanel({ analysisId }: { analysisId: string }) {
 
 export default function Home() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [isPro, setIsPro] = useState(false);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -269,6 +274,14 @@ export default function Home() {
     return () => {
       if (stepTimeoutRef.current) clearTimeout(stepTimeoutRef.current);
     };
+  }, []);
+
+  // Check Pro status on mount
+  useEffect(() => {
+    fetch("/api/pro-status")
+      .then((res) => res.json())
+      .then((data) => setIsPro(data.isPro ?? false))
+      .catch(() => setIsPro(false));
   }, []);
 
   // Load saved theme on mount
@@ -391,6 +404,7 @@ export default function Home() {
       setAnalysis(data.analysis);
       setPlatform(data.platform || "");
       setAnalysisId(data.id || null);
+      if (data.isPro !== undefined) setIsPro(data.isPro);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") {
         setError(errorMessages.timeout);
@@ -462,7 +476,7 @@ export default function Home() {
           <span className="text-white/60">are really saying</span>
         </h1>
         <p className="text-white/50 text-base font-light max-w-lg mx-auto mb-8 leading-relaxed">
-          The comments don't lie. Stop scrolling and find out what they're really saying.
+          Know if the backlash is real, mixed, or just noise — in seconds.
         </p>
 
         <div className="relative w-full max-w-2xl mx-auto mb-3">
@@ -531,15 +545,19 @@ export default function Home() {
       {analysis && (
         <section className="max-w-5xl mx-auto px-6 pb-24 space-y-3">
 
-          {/* Platform Badge + Snapshot Label */}
+          {/* Platform Badge + Analysis Type Label */}
           {platform && (
             <div className="flex items-center gap-2 pb-1">
               <span className="text-[10px] font-semibold tracking-widest uppercase text-white/30 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
                 {platform}
               </span>
               <span className="text-[10px] text-white/20">·</span>
-              <span className="text-[10px] font-semibold tracking-widest uppercase text-[#FF6B00]/60 bg-[#FF6B00]/5 border border-[#FF6B00]/15 px-3 py-1 rounded-full">
-                Quick Snapshot
+              <span className={`text-[10px] font-semibold tracking-widest uppercase px-3 py-1 rounded-full border ${
+                isPro
+                  ? "text-[#FF6B00] bg-[#FF6B00]/10 border-[#FF6B00]/30"
+                  : "text-[#FF6B00]/60 bg-[#FF6B00]/5 border-[#FF6B00]/15"
+              }`}>
+                {isPro ? "Deep Dive" : "Quick Snapshot"}
               </span>
             </div>
           )}
@@ -632,8 +650,45 @@ export default function Home() {
             </div>
           )}
 
+          {/* Pro Deep Dive Sections */}
+          {isPro && analysis.confidence_score && (
+            <div className="bg-[#FF6B00]/5 border border-[#FF6B00]/20 rounded-2xl p-5 space-y-4">
+              <p className="text-[10px] font-semibold tracking-widest uppercase text-[#FF6B00]/70">
+                Deep Dive
+              </p>
+
+              {/* Confidence Score */}
+              <div>
+                <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-2">
+                  Confidence
+                </p>
+                <p className="text-white/80 text-sm leading-relaxed">{analysis.confidence_score}</p>
+              </div>
+
+              {/* Deep Disagreement */}
+              {analysis.deep_disagreement && (
+                <div>
+                  <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-2">
+                    The Real Split
+                  </p>
+                  <p className="text-white/80 text-sm leading-relaxed">{analysis.deep_disagreement}</p>
+                </div>
+              )}
+
+              {/* Minority Opinion */}
+              {analysis.minority_opinion && (
+                <div>
+                  <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-2">
+                    The Minority Take
+                  </p>
+                  <p className="text-white/80 text-sm leading-relaxed">{analysis.minority_opinion}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Pro Q&A */}
-          {analysisId && <QAPanel analysisId={analysisId} />}
+          {analysisId && <QAPanel analysisId={analysisId} isPro={isPro} />}
 
           {/* Share */}
           {analysisId && (

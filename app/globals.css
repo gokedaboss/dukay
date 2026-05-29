@@ -1,59 +1,34 @@
 @import "tailwindcss";
 
-/* ============================================
-   SEMANTIC THEME TOKENS
-   All colors live here — nowhere else.
-   To update the look of the app, change these.
-   ============================================ */
-
 :root {
-  /* Dark mode (default) */
-  --bg-base:        #111111;   /* main page background */
-  --bg-surface:     #1a1a1a;   /* cards and panels */
-  --bg-elevated:    #222222;   /* inputs, hover states */
-
-  --text-primary:   #ffffff;   /* headings, bold text */
-  --text-secondary: rgba(255,255,255,0.6);  /* body text */
-  --text-muted:     rgba(255,255,255,0.3);  /* labels, hints */
-
-  --border-subtle:  rgba(255,255,255,0.08); /* card borders */
-  --border-default: rgba(255,255,255,0.15); /* input borders */
-
-  --accent:         #FF6B00;   /* orange — buttons, highlights */
-  --accent-muted:   rgba(255,107,0,0.15);   /* orange backgrounds */
-  --accent-border:  rgba(255,107,0,0.3);    /* orange borders */
-
-  --nav-bg:         rgba(17,17,17,0.9);     /* navbar backdrop */
+  --bg-base:        #111111;
+  --bg-surface:     #1a1a1a;
+  --bg-elevated:    #222222;
+  --text-primary:   #ffffff;
+  --text-secondary: rgba(255,255,255,0.6);
+  --text-muted:     rgba(255,255,255,0.3);
+  --border-subtle:  rgba(255,255,255,0.08);
+  --border-default: rgba(255,255,255,0.15);
+  --accent:         #FF6B00;
+  --accent-muted:   rgba(255,107,0,0.15);
+  --accent-border:  rgba(255,107,0,0.3);
+  --nav-bg:         rgba(17,17,17,0.9);
 }
-
-/* ============================================
-   LIGHT MODE TOKENS
-   Soft off-white — not pure white.
-   Premium and calm, like Notion or Linear.
-   ============================================ */
 
 [data-theme="light"] {
-  --bg-base:        #f5f4f2;   /* warm off-white */
-  --bg-surface:     #eeecea;   /* soft gray cards */
-  --bg-elevated:    #e5e3e0;   /* inputs, hover states */
-
-  --text-primary:   #1a1a1a;   /* near-black, not harsh */
+  --bg-base:        #f5f4f2;
+  --bg-surface:     #eeecea;
+  --bg-elevated:    #e5e3e0;
+  --text-primary:   #1a1a1a;
   --text-secondary: rgba(26,26,26,0.6);
   --text-muted:     rgba(26,26,26,0.4);
-
   --border-subtle:  rgba(0,0,0,0.07);
   --border-default: rgba(0,0,0,0.12);
-
-  --accent:         #e05e00;   /* slightly deeper orange for light bg */
+  --accent:         #e05e00;
   --accent-muted:   rgba(224,94,0,0.1);
   --accent-border:  rgba(224,94,0,0.25);
-
   --nav-bg:         rgba(245,244,242,0.92);
 }
-
-/* ============================================
-   BASE STYLES
-   ============================================ */
 
 @theme inline {
   --font-sans: var(--font-geist-sans);
@@ -67,7 +42,73 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Smooth theme transition on all elements */
 *, *::before, *::after {
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease;
+}
+
+/* ============================================
+   LIGHT MODE — force solid dark text on everything
+   ============================================ */
+
+[data-theme="light"] * {
+  color: #1a1a1a !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
+[data-theme="light"] [class*="bg-white"],
+[data-theme="light"] [class*="bg-white\/"] {
+  background-color: #eeecea !important;
+}
+
+[data-theme="light"] [class*="bg-white\/15"] {
+  background-color: rgba(0,0,0,0.08) !important;
+}
+
+[data-theme="light"] body,
+[data-theme="light"] main {
+  background-color: #f5f4f2 !important;
+}
+
+[data-theme="light"] nav {
+  background-color: rgba(245,244,242,0.92) !important;
+}
+
+[data-theme="light"] input {
+  background-color: #e5e3e0 !important;
+  color: #1a1a1a !important;
+}
+
+[data-theme="light"] input::placeholder {
+  color: rgba(26,26,26,0.4) !important;
+  opacity: 1 !important;
+}
+
+[data-theme="light"] [class*="fill-white"] {
+  fill: rgba(26,26,26,0.4) !important;
+}
+
+/* Keep orange accent color in light mode */
+[data-theme="light"] [class*="text-\[#FF6B00\]"],
+[data-theme="light"] [class*="text-\[#e05e00\]"] {
+  color: #e05e00 !important;
+}
+
+/* Keep red/green/orange verdict colors */
+[data-theme="light"] [class*="text-red-"] {
+  color: #dc2626 !important;
+}
+
+[data-theme="light"] [class*="text-green-"] {
+  color: #16a34a !important;
+}
+
+[data-theme="light"] [class*="text-orange-"] {
+  color: #ea580c !important;
+}
+
+/* Keep spinner and progress bar colors */
+[data-theme="light"] [class*="border-\[#FF6B00\]"],
+[data-theme="light"] [class*="bg-\[#FF6B00\]"] {
+  border-color: #e05e00 !important;
+  background-color: #e05e00 !important;
 }
