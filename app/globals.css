@@ -1,26 +1,73 @@
 @import "tailwindcss";
 
+/* ============================================
+   SEMANTIC THEME TOKENS
+   All colors live here — nowhere else.
+   To update the look of the app, change these.
+   ============================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Dark mode (default) */
+  --bg-base:        #111111;   /* main page background */
+  --bg-surface:     #1a1a1a;   /* cards and panels */
+  --bg-elevated:    #222222;   /* inputs, hover states */
+
+  --text-primary:   #ffffff;   /* headings, bold text */
+  --text-secondary: rgba(255,255,255,0.6);  /* body text */
+  --text-muted:     rgba(255,255,255,0.3);  /* labels, hints */
+
+  --border-subtle:  rgba(255,255,255,0.08); /* card borders */
+  --border-default: rgba(255,255,255,0.15); /* input borders */
+
+  --accent:         #FF6B00;   /* orange — buttons, highlights */
+  --accent-muted:   rgba(255,107,0,0.15);   /* orange backgrounds */
+  --accent-border:  rgba(255,107,0,0.3);    /* orange borders */
+
+  --nav-bg:         rgba(17,17,17,0.9);     /* navbar backdrop */
 }
 
+/* ============================================
+   LIGHT MODE TOKENS
+   Soft off-white — not pure white.
+   Premium and calm, like Notion or Linear.
+   ============================================ */
+
+[data-theme="light"] {
+  --bg-base:        #f5f4f2;   /* warm off-white */
+  --bg-surface:     #eeecea;   /* soft gray cards */
+  --bg-elevated:    #e5e3e0;   /* inputs, hover states */
+
+  --text-primary:   #1a1a1a;   /* near-black, not harsh */
+  --text-secondary: rgba(26,26,26,0.6);
+  --text-muted:     rgba(26,26,26,0.4);
+
+  --border-subtle:  rgba(0,0,0,0.07);
+  --border-default: rgba(0,0,0,0.12);
+
+  --accent:         #e05e00;   /* slightly deeper orange for light bg */
+  --accent-muted:   rgba(224,94,0,0.1);
+  --accent-border:  rgba(224,94,0,0.25);
+
+  --nav-bg:         rgba(245,244,242,0.92);
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Smooth theme transition on all elements */
+*, *::before, *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease;
 }

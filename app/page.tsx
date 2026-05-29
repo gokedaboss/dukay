@@ -252,6 +252,7 @@ function QAPanel({ analysisId }: { analysisId: string }) {
 }
 
 export default function Home() {
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -269,6 +270,21 @@ export default function Home() {
       if (stepTimeoutRef.current) clearTimeout(stepTimeoutRef.current);
     };
   }, []);
+
+  // Load saved theme on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("dukay_theme") as "dark" | "light" | null;
+    const initial = saved || "dark";
+    setTheme(initial);
+    document.documentElement.setAttribute("data-theme", initial);
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("dukay_theme", next);
+  };
 
   useEffect(() => {
     const pending = localStorage.getItem("dukay_pending_checkout");
@@ -417,14 +433,23 @@ export default function Home() {
       : "bg-green-500/20 text-green-300 border-green-500/30";
 
   return (
-    <main className="min-h-screen bg-[#111111] text-white font-sans">
+    <main className="min-h-screen font-sans" style={{ backgroundColor: "var(--bg-base)", color: "var(--text-primary)" }}>
 
       {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 flex justify-between items-center px-6 py-4 border-b border-white/10 backdrop-blur-md bg-[#111111]/90 z-50">
+      <nav className="fixed top-0 left-0 right-0 flex justify-between items-center px-6 py-4 border-b backdrop-blur-md z-50" style={{ backgroundColor: "var(--nav-bg)", borderColor: "var(--border-subtle)" }}>
         <span className="text-lg font-black tracking-tight text-[#FF6B00]">Dükay</span>
-        <button className="bg-[#FF6B00] text-black text-xs font-bold px-4 py-2 rounded-lg hover:opacity-80 transition">
-          Analyze Free
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleTheme}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/15 text-white/50 hover:text-white/80 hover:border-white/30 transition text-sm"
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+          <button className="bg-[#FF6B00] text-black text-xs font-bold px-4 py-2 rounded-lg hover:opacity-80 transition">
+            Analyze Free
+          </button>
+        </div>
       </nav>
 
       {/* Hero */}
