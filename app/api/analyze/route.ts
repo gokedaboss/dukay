@@ -4,26 +4,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { auth } from "@clerk/nextjs/server";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
-const apify = new ApifyClient({
-  token: process.env.APIFY_API_TOKEN,
-});
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const apify = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 const PROMPT_VERSION = "1.1";
-
 const FREE_COMMENT_LIMIT = 80;
 const PRO_COMMENT_LIMIT = 200;
 const FREE_USER_ANALYSIS_LIMIT = 3;
-
-// --- COMMENT QUALITY FILTER ---
+const RESET_DAYS = 30;
 
 const SPAM_PATTERNS = [
   /^[\s\u00a0]*$/,
@@ -48,14 +37,13 @@ const seenComments = new Set<string>();
 function isLowQuality(comment: string): boolean {
   const trimmed = comment.trim();
   if (trimmed.split(/\s+/).filter(Boolean).length < MIN_WORDS) return true;
-  if (SPAM_PATTERNS.some((pattern) => pattern.test(trimmed))) return true;
+  if (SPAM_PATTERNS.some((p) => p.test(trimmed))) return true;
   return false;
 }
 
 function filterComments(comments: string[]): string[] {
   seenComments.clear();
   const filtered: string[] = [];
-
   for (const comment of comments) {
     const trimmed = comment.trim();
     const normalized = trimmed.toLowerCase().replace(/\s+/g, " ");
@@ -64,11 +52,8 @@ function filterComments(comments: string[]): string[] {
     if (isLowQuality(trimmed)) continue;
     filtered.push(trimmed);
   }
-
   return filtered;
 }
-
-// --- END COMMENT QUALITY FILTER ---
 
 const DUKAY_PROMPT = `You are Dükay — a sharp, culturally aware comment reader.
 
@@ -159,10 +144,8 @@ const PRO_EXTENSION = `
 
 This is a Deep Dive analysis. In addition to the standard JSON fields above, also include these three extra fields in your JSON response:
 
-"confidence_score": "High confidence, Medium confidence, or Low confidence only — never a number or percentage. Follow with one plain sentence explaining why. Example: 'High confidence — the same arguments appeared consistently across hundreds of comments.'",
-
+"confidence_score": "High confidence, Medium confidence, or Low confidence only — never a number or percentage. Follow with one plain sentence explaining why.",
 "deep_disagreement": "Go deeper than the standard disagreement field. Map out the two or three distinct camps in the comments — who they are, what they believe, and why they won't agree. Be specific. 3-4 sentences.",
-
 "minority_opinion": "The view held by a small but vocal group that the majority is ignoring or dismissing. Why are they saying it? Is there any merit to it? 2-3 sentences. If no clear minority opinion exists, say so plainly."
 
 These three fields must appear at the end of the JSON object, after vibe_interpretation.`;
@@ -179,300 +162,138 @@ function detectPlatform(url: string): string {
 }
 
 function getPlatformLabel(platform: string): string {
-  const labels: Record<string, string> = {
-    instagram: "Instagram",
-    youtube: "YouTube",
-    reddit: "Reddit",
-    tiktok: "TikTok",
-    twitter: "X (Twitter)",
-    facebook: "Facebook",
-    linkedin: "LinkedIn",
-  };
+  const labels: Record<string, string> = { instagram: "Instagram", youtube: "YouTube", reddit: "Reddit", tiktok: "TikTok", twitter: "X (Twitter)", facebook: "Facebook", linkedin: "LinkedIn" };
   return labels[platform] || platform;
 }
 
 async function fetchInstagramComments(url: string, limit: number): Promise<string[]> {
-  const run = await apify.actor("apify/instagram-comment-scraper").call({
-    directUrls: [url],
-    resultsLimit: limit,
-    sort: "top",
-  });
+  const run = await apify.actor("apify/instagram-comment-scraper").call({ directUrls: [url], resultsLimit: limit, sort: "top" });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
-  return items
-    .map((item: Record<string, unknown>) => {
-      const text = item.text || item.comment || item.body;
-      return typeof text === "string" ? text.trim() : null;
-    })
-    .filter((text): text is string => !!text && text.length > 3);
+  return items.map((item: Record<string, unknown>) => { const text = item.text || item.comment || item.body; return typeof text === "string" ? text.trim() : null; }).filter((text): text is string => !!text && text.length > 3);
 }
-
 async function fetchYouTubeComments(url: string, limit: number): Promise<string[]> {
-  const run = await apify.actor("streamers/youtube-comments-scraper").call({
-    startUrls: [{ url }],
-    maxComments: limit,
-  });
+  const run = await apify.actor("streamers/youtube-comments-scraper").call({ startUrls: [{ url }], maxComments: limit });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
-  return items
-    .map((item: Record<string, unknown>) => {
-      const text = item.text || item.comment || item.body;
-      return typeof text === "string" ? text.trim() : null;
-    })
-    .filter((text): text is string => !!text && text.length > 3);
+  return items.map((item: Record<string, unknown>) => { const text = item.text || item.comment || item.body; return typeof text === "string" ? text.trim() : null; }).filter((text): text is string => !!text && text.length > 3);
 }
-
 async function fetchRedditComments(url: string, limit: number): Promise<string[]> {
-  const run = await apify.actor("trudax/reddit-scraper-lite").call({
-    startUrls: [{ url }],
-    skipComments: false,
-    maxItems: limit,
-    sort: "top",
-  });
+  const run = await apify.actor("trudax/reddit-scraper-lite").call({ startUrls: [{ url }], skipComments: false, maxItems: limit, sort: "top" });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
-  return items
-    .map((item: Record<string, unknown>) => {
-      const text = item.body || item.text || item.comment;
-      return typeof text === "string" ? text.trim() : null;
-    })
-    .filter((text): text is string => !!text && text.length > 3);
+  return items.map((item: Record<string, unknown>) => { const text = item.body || item.text || item.comment; return typeof text === "string" ? text.trim() : null; }).filter((text): text is string => !!text && text.length > 3);
 }
-
 async function fetchTikTokComments(url: string, limit: number): Promise<string[]> {
-  const run = await apify.actor("clockworks/tiktok-comments-scraper").call({
-    postURLs: [url],
-    maxComments: limit,
-    sortBy: "likes",
-  });
+  const run = await apify.actor("clockworks/tiktok-comments-scraper").call({ postURLs: [url], maxComments: limit, sortBy: "likes" });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
-  return items
-    .map((item: Record<string, unknown>) => {
-      const text = item.text || item.comment || item.body;
-      return typeof text === "string" ? text.trim() : null;
-    })
-    .filter((text): text is string => !!text && text.length > 3);
+  return items.map((item: Record<string, unknown>) => { const text = item.text || item.comment || item.body; return typeof text === "string" ? text.trim() : null; }).filter((text): text is string => !!text && text.length > 3);
 }
-
 async function fetchXComments(url: string, limit: number): Promise<string[]> {
-  const run = await apify.actor("scraper_one/x-post-replies-scraper").call({
-    postUrls: [url],
-    resultsLimit: limit,
-  });
+  const run = await apify.actor("scraper_one/x-post-replies-scraper").call({ postUrls: [url], resultsLimit: limit });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
-  return items
-    .map((item: Record<string, unknown>) => {
-      const text = item.text || item.comment || item.body || item.full_text;
-      return typeof text === "string" ? text.trim() : null;
-    })
-    .filter((text): text is string => !!text && text.length > 3);
+  return items.map((item: Record<string, unknown>) => { const text = item.text || item.comment || item.body || item.full_text; return typeof text === "string" ? text.trim() : null; }).filter((text): text is string => !!text && text.length > 3);
 }
-
 async function fetchFacebookComments(url: string, limit: number): Promise<string[]> {
-  const run = await apify.actor("apify/facebook-comments-scraper").call({
-    startUrls: [{ url }],
-    maxComments: limit,
-    commentsMode: "RANKED_THREADED",
-  });
+  const run = await apify.actor("apify/facebook-comments-scraper").call({ startUrls: [{ url }], maxComments: limit, commentsMode: "RANKED_THREADED" });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
-  return items
-    .map((item: Record<string, unknown>) => {
-      const text = item.message || item.text || item.comment || item.body;
-      return typeof text === "string" ? text.trim() : null;
-    })
-    .filter((text): text is string => !!text && text.length > 3);
+  return items.map((item: Record<string, unknown>) => { const text = item.message || item.text || item.comment || item.body; return typeof text === "string" ? text.trim() : null; }).filter((text): text is string => !!text && text.length > 3);
 }
-
 async function fetchLinkedInComments(url: string, limit: number): Promise<string[]> {
-  const run = await apify.actor("apimaestro/linkedin-post-comments-replies-engagements-scraper-no-cookies").call({
-    postIds: [url],
-    maxResults: limit,
-  });
+  const run = await apify.actor("apimaestro/linkedin-post-comments-replies-engagements-scraper-no-cookies").call({ postIds: [url], maxResults: limit });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
-  return items
-    .map((item: Record<string, unknown>) => {
-      const text = item.text || item.comment || item.body || item.commentText;
-      return typeof text === "string" ? text.trim() : null;
-    })
-    .filter((text): text is string => !!text && text.length > 3);
+  return items.map((item: Record<string, unknown>) => { const text = item.text || item.comment || item.body || item.commentText; return typeof text === "string" ? text.trim() : null; }).filter((text): text is string => !!text && text.length > 3);
 }
 
 export async function POST(request: NextRequest) {
   try {
     const { url } = await request.json();
-
-    if (!url) {
-      return NextResponse.json({ error: "No URL provided" }, { status: 400 });
-    }
+    if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
     const platform = detectPlatform(url);
     const platformLabel = getPlatformLabel(platform);
+    if (platform === "unknown") return NextResponse.json({ error: "Unsupported platform" }, { status: 400 });
 
-    if (platform === "unknown") {
-      return NextResponse.json({ error: "Unsupported platform" }, { status: 400 });
-    }
-
-    // Verify Pro + signed-in status server-side
     const { userId } = await auth();
     let isPro = false;
     let isSignedIn = false;
 
     if (userId) {
       isSignedIn = true;
-      const { data: proUser } = await supabase
-        .from("pro_users")
-        .select("is_pro")
-        .eq("clerk_user_id", userId)
-        .single();
+      const { data: proUser } = await supabase.from("pro_users").select("is_pro").eq("clerk_user_id", userId).single();
       isPro = proUser?.is_pro === true;
     }
 
-    // --- Signed-in free user limit check ---
-    // Pro users skip this. Anonymous users are handled on the frontend via localStorage.
+    // Signed-in free user limit check with 30-day reset
     if (isSignedIn && !isPro) {
-      const { data: usage } = await supabase
-        .from("user_usage")
-        .select("analysis_count")
-        .eq("clerk_user_id", userId)
-        .single();
+      const { data: usage } = await supabase.from("user_usage").select("analysis_count, reset_at").eq("clerk_user_id", userId).single();
 
-      const currentCount = usage?.analysis_count ?? 0;
+      if (usage) {
+        const resetAt = new Date(usage.reset_at);
+        const now = new Date();
+        const daysSinceReset = (now.getTime() - resetAt.getTime()) / (1000 * 60 * 60 * 24);
 
-      if (currentCount >= FREE_USER_ANALYSIS_LIMIT) {
-        return NextResponse.json({ error: "free_limit_reached" }, { status: 403 });
+        if (daysSinceReset >= RESET_DAYS) {
+          // Reset count and timestamp — allow this analysis through
+          await supabase.from("user_usage").update({ analysis_count: 0, reset_at: now.toISOString(), updated_at: now.toISOString() }).eq("clerk_user_id", userId);
+        } else if (usage.analysis_count >= FREE_USER_ANALYSIS_LIMIT) {
+          return NextResponse.json({ error: "free_limit_reached" }, { status: 403 });
+        }
+      } else {
+        // No usage row yet — create one so future checks work
+        await supabase.from("user_usage").insert({ clerk_user_id: userId, analysis_count: 0, reset_at: new Date().toISOString() });
       }
     }
 
-    // Check cache first
-    const { data: cached } = await supabase
-      .from("analyses")
-      .select("id, analysis, prompt_version, is_pro")
-      .eq("url", url)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
+    const { data: cached } = await supabase.from("analyses").select("id, analysis, prompt_version, is_pro").eq("url", url).order("created_at", { ascending: false }).limit(1).single();
     if (cached?.analysis && cached?.prompt_version === PROMPT_VERSION) {
-      return NextResponse.json({
-        analysis: cached.analysis,
-        platform: platformLabel,
-        cached: true,
-        id: cached.id,
-        isPro: cached.is_pro ?? false,
-        isSignedIn,
-      });
+      return NextResponse.json({ analysis: cached.analysis, platform: platformLabel, cached: true, id: cached.id, isPro: cached.is_pro ?? false, isSignedIn });
     }
 
     const commentLimit = isPro ? PRO_COMMENT_LIMIT : FREE_COMMENT_LIMIT;
-
     let comments: string[] = [];
 
-    if (platform === "instagram") {
-      comments = await fetchInstagramComments(url, commentLimit);
-    } else if (platform === "youtube") {
-      comments = await fetchYouTubeComments(url, commentLimit);
-    } else if (platform === "reddit") {
-      comments = await fetchRedditComments(url, commentLimit);
-    } else if (platform === "tiktok") {
-      comments = await fetchTikTokComments(url, commentLimit);
-    } else if (platform === "twitter") {
-      comments = await fetchXComments(url, commentLimit);
-    } else if (platform === "facebook") {
-      comments = await fetchFacebookComments(url, commentLimit);
-    } else if (platform === "linkedin") {
-      comments = await fetchLinkedInComments(url, commentLimit);
-    }
+    if (platform === "instagram") comments = await fetchInstagramComments(url, commentLimit);
+    else if (platform === "youtube") comments = await fetchYouTubeComments(url, commentLimit);
+    else if (platform === "reddit") comments = await fetchRedditComments(url, commentLimit);
+    else if (platform === "tiktok") comments = await fetchTikTokComments(url, commentLimit);
+    else if (platform === "twitter") comments = await fetchXComments(url, commentLimit);
+    else if (platform === "facebook") comments = await fetchFacebookComments(url, commentLimit);
+    else if (platform === "linkedin") comments = await fetchLinkedInComments(url, commentLimit);
 
-    if (comments.length === 0) {
-      return NextResponse.json(
-        { error: "No comments found for this post." },
-        { status: 400 }
-      );
-    }
+    if (comments.length === 0) return NextResponse.json({ error: "No comments found for this post." }, { status: 400 });
 
     const filteredComments = filterComments(comments);
     const commentsToAnalyze = filteredComments.length >= 5 ? filteredComments : comments;
-
-    const commentsText = commentsToAnalyze
-      .map((c: string, i: number) => `${i + 1}. ${c}`)
-      .join("\n");
-
-    const prompt = isPro
-      ? `${DUKAY_PROMPT}${PRO_EXTENSION}\n\nHere are the comments to analyze:\n\n${commentsText}`
-      : `${DUKAY_PROMPT}\n\nHere are the comments to analyze:\n\n${commentsText}`;
+    const commentsText = commentsToAnalyze.map((c, i) => `${i + 1}. ${c}`).join("\n");
+    const prompt = isPro ? `${DUKAY_PROMPT}${PRO_EXTENSION}\n\nHere are the comments to analyze:\n\n${commentsText}` : `${DUKAY_PROMPT}\n\nHere are the comments to analyze:\n\n${commentsText}`;
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: isPro ? 1800 : 1024,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+      messages: [{ role: "user", content: prompt }],
     });
 
-    const responseText =
-      message.content[0].type === "text" ? message.content[0].text : "";
-
-    const cleaned = responseText
-      .replace(/^```json\s*/i, "")
-      .replace(/^```\s*/i, "")
-      .replace(/```\s*$/i, "")
-      .trim();
-
+    const responseText = message.content[0].type === "text" ? message.content[0].text : "";
+    const cleaned = responseText.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
     const analysis = JSON.parse(cleaned);
 
-    // Save analysis to Supabase
     let analysisId = null;
     try {
-      const { data: saved } = await supabase
-        .from("analyses")
-        .insert({
-          url,
-          platform,
-          comments: commentsToAnalyze,
-          analysis,
-          prompt_version: PROMPT_VERSION,
-          is_pro: isPro,
-        })
-        .select("id")
-        .single();
+      const { data: saved } = await supabase.from("analyses").insert({ url, platform, comments: commentsToAnalyze, analysis, prompt_version: PROMPT_VERSION, is_pro: isPro, clerk_user_id: userId ?? null }).select("id").single();
       analysisId = saved?.id;
-    } catch (dbError) {
-      console.error("DB save error:", dbError);
-    }
+    } catch (dbError) { console.error("DB save error:", dbError); }
 
-    // Increment usage count for signed-in free users
+    // Increment usage for signed-in free users
     if (isSignedIn && !isPro) {
       try {
-        const { data: existing } = await supabase
-          .from("user_usage")
-          .select("analysis_count")
-          .eq("clerk_user_id", userId)
-          .single();
-
+        const { data: existing } = await supabase.from("user_usage").select("analysis_count").eq("clerk_user_id", userId).single();
         if (existing) {
-          await supabase
-            .from("user_usage")
-            .update({
-              analysis_count: existing.analysis_count + 1,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("clerk_user_id", userId);
-        } else {
-          await supabase
-            .from("user_usage")
-            .insert({ clerk_user_id: userId, analysis_count: 1 });
+          await supabase.from("user_usage").update({ analysis_count: existing.analysis_count + 1, updated_at: new Date().toISOString() }).eq("clerk_user_id", userId);
         }
-      } catch (usageError) {
-        console.error("Usage tracking error:", usageError);
-      }
+      } catch (usageError) { console.error("Usage tracking error:", usageError); }
     }
 
     return NextResponse.json({ analysis, platform: platformLabel, id: analysisId, isPro, isSignedIn });
   } catch (error) {
     console.error("Analysis error:", error);
-    return NextResponse.json(
-      { error: "Analysis failed. Please try again." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Analysis failed. Please try again." }, { status: 500 });
   }
 }

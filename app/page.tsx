@@ -105,7 +105,7 @@ function ProGatePopup({ onClose }: { onClose: () => void }) {
           <p className="text-white/20 text-xs">Cancel anytime</p>
         </div>
         <div className="w-full border-t border-white/10 pt-4 space-y-2 text-left">
-          {["Unlimited analyses","Deep Dive analysis (200 comments)","Unlimited Q&A per analysis","Saved history"].map((feature) => (
+          {["Unlimited analyses","Deep Dive analysis","Unlimited Q&A per analysis","Saved history"].map((feature) => (
             <div key={feature} className="flex items-center gap-2">
               <span className="text-[#FF6B00] text-xs">✓</span>
               <span className="text-white/60 text-xs">{feature}</span>
@@ -249,6 +249,7 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [showSignupGate, setShowSignupGate] = useState(false);
   const [showProGate, setShowProGate] = useState(false);
+  const [name, setName] = useState("");
   const stepTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isLight = theme === "light";
@@ -264,7 +265,7 @@ export default function Home() {
   useEffect(() => { return () => { if (stepTimeoutRef.current) clearTimeout(stepTimeoutRef.current); }; }, []);
 
   useEffect(() => {
-    fetch("/api/pro-status").then((res) => res.json()).then((data) => { setIsPro(data.isPro ?? false); setIsSignedIn(data.isSignedIn ?? false); }).catch(() => { setIsPro(false); setIsSignedIn(false); });
+    fetch("/api/pro-status").then((res) => res.json()).then((data) => { setIsPro(data.isPro ?? false); setIsSignedIn(data.isSignedIn ?? false); if (data.isSignedIn) { fetch("/api/profile").then((r) => r.json()).then((p) => { if (p.name) setName(p.name); }).catch(() => {}); } }).catch(() => { setIsPro(false); setIsSignedIn(false); });
   }, []);
 
   useEffect(() => {
@@ -392,13 +393,22 @@ export default function Home() {
             )}
           </svg>
         </div>
-        <span className="absolute left-1/2 -translate-x-1/2 text-lg font-black tracking-tight" style={{ color: accent }}>Dükay</span>
+        
         <div className="flex items-center gap-3">
           <button onClick={toggleTheme} style={{ borderColor: isLight ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.15)", color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)" }} className="w-8 h-8 flex items-center justify-center rounded-lg border transition text-sm" aria-label="Toggle theme">
             {isLight ? "🌙" : "☀️"}
           </button>
-          <a href="/sign-in" style={{ color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)" }} className="text-xs font-semibold transition px-2">Sign in</a>
-          <button style={{ backgroundColor: accent, color: "#ffffff" }} className="text-xs font-bold px-4 py-2 rounded-lg hover:opacity-80 transition">Analyze Free</button>
+          {isSignedIn ? (
+            <>
+              <a href="/history" style={{ color: mutedText }} className="text-xs font-semibold transition px-2 hover:opacity-80">History</a>
+              <a href="/profile" style={{ backgroundColor: accent, color: "#ffffff" }} className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black hover:opacity-80 transition">{name ? name.charAt(0).toUpperCase() : "?"}</a>
+            </>
+          ) : (
+            <>
+              <a href="/sign-in" style={{ color: mutedText }} className="text-xs font-semibold transition px-2">Sign in</a>
+              <span className="text-lg font-black tracking-tight" style={{ color: accent }}>Dükay</span>
+            </>
+          )}
         </div>
       </nav>
 
@@ -409,7 +419,7 @@ export default function Home() {
           See what the comments{" "}
           <span style={{ color: mutedText }}>are really saying</span>
         </h1>
-        <p style={{ color: mutedText }} className="text-base font-light max-w-lg mx-auto mb-8 leading-relaxed">Know if the backlash is real, mixed, or just noise — in seconds.</p>
+        <p style={{ color: mutedText }} className="text-base font-light max-w-lg mx-auto mb-8 leading-relaxed">The comments don't lie. Stop scrolling and find out what they're really saying.</p>
 
         <div className="relative w-full max-w-2xl mx-auto mb-3">
           <input
