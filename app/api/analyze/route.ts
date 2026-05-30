@@ -19,46 +19,36 @@ const supabase = createClient(
 
 const PROMPT_VERSION = "1.1";
 
-// Free tier fetches 80 comments (fast snapshot), Pro fetches 200 (deep dive)
 const FREE_COMMENT_LIMIT = 80;
 const PRO_COMMENT_LIMIT = 200;
+const FREE_USER_ANALYSIS_LIMIT = 3;
 
 // --- COMMENT QUALITY FILTER ---
-// Removes low-signal noise before Claude sees anything.
-// Keeps slang, humor, sarcasm, and internet culture intact.
-// Only removes genuine garbage that adds zero signal.
 
 const SPAM_PATTERNS = [
-  /^[\s\u00a0]*$/,                                          // blank / whitespace only
-  /^[\p{Emoji}\s]+$/u,                                      // emoji-only
-  /^(.)\1{4,}$/,                                            // repeated single char: "lllllll"
-  /\b(first|1st)\b/i,                                       // "first" comments
-  /who('?s| is) here in 20\d\d/i,                          // "who's here in 2026"
-  /follow (me|back|for follow)/i,                           // follow-for-follow spam
-  /check (out )?my (channel|page|profile|bio)/i,            // self-promo
-  /sub(scribe)? (to )?my/i,                                 // subscribe spam
-  /\b(dm|message) me\b.{0,30}(deal|offer|invest|profit)/i, // crypto DM bait
-  /\b(bitcoin|crypto|nft|forex|invest(ment)?)\b.{0,60}(profit|return|earn|dm|contact)/i, // crypto spam
-  /\b(giveaway|give away)\b.{0,60}(follow|like|comment|enter|win)/i, // giveaway spam
-  /https?:\/\/\S+/,                                         // comments that are just a link
-  /(#\w+\s*){4,}/,                                          // 4+ hashtags — hashtag spam
-  /^(lol+|lmao+|haha+|😂+|💀+|🔥+)$/i,                   // pure reaction with no substance
+  /^[\s\u00a0]*$/,
+  /^[\p{Emoji}\s]+$/u,
+  /^(.)\1{4,}$/,
+  /\b(first|1st)\b/i,
+  /who('?s| is) here in 20\d\d/i,
+  /follow (me|back|for follow)/i,
+  /check (out )?my (channel|page|profile|bio)/i,
+  /sub(scribe)? (to )?my/i,
+  /\b(dm|message) me\b.{0,30}(deal|offer|invest|profit)/i,
+  /\b(bitcoin|crypto|nft|forex|invest(ment)?)\b.{0,60}(profit|return|earn|dm|contact)/i,
+  /\b(giveaway|give away)\b.{0,60}(follow|like|comment|enter|win)/i,
+  /https?:\/\/\S+/,
+  /(#\w+\s*){4,}/,
+  /^(lol+|lmao+|haha+|😂+|💀+|🔥+)$/i,
 ];
 
-// Minimum word count to be considered a real comment
 const MIN_WORDS = 2;
-// Maximum duplicate comments allowed (catches copy-paste spam)
 const seenComments = new Set<string>();
 
 function isLowQuality(comment: string): boolean {
   const trimmed = comment.trim();
-
-  // Too short
   if (trimmed.split(/\s+/).filter(Boolean).length < MIN_WORDS) return true;
-
-  // Matches any spam pattern
   if (SPAM_PATTERNS.some((pattern) => pattern.test(trimmed))) return true;
-
   return false;
 }
 
@@ -68,15 +58,10 @@ function filterComments(comments: string[]): string[] {
 
   for (const comment of comments) {
     const trimmed = comment.trim();
-
-    // Skip duplicates (copy-paste spam)
     const normalized = trimmed.toLowerCase().replace(/\s+/g, " ");
     if (seenComments.has(normalized)) continue;
     seenComments.add(normalized);
-
-    // Skip low quality
     if (isLowQuality(trimmed)) continue;
-
     filtered.push(trimmed);
   }
 
@@ -170,7 +155,6 @@ Rules:
 - backstory must only reference what commenters clearly mention — never invent post content
 - backstory must use soft inferential language, never confident assertions about the original post`;
 
-// Pro Deep Dive — extends the base prompt with 3 additional fields
 const PRO_EXTENSION = `
 
 This is a Deep Dive analysis. In addition to the standard JSON fields above, also include these three extra fields in your JSON response:
@@ -207,12 +191,11 @@ function getPlatformLabel(platform: string): string {
   return labels[platform] || platform;
 }
 
-// Instagram: sort by top likes using "top" sort order
 async function fetchInstagramComments(url: string, limit: number): Promise<string[]> {
   const run = await apify.actor("apify/instagram-comment-scraper").call({
     directUrls: [url],
     resultsLimit: limit,
-    sort: "top", // top liked comments first
+    sort: "top",
   });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
   return items
@@ -223,12 +206,10 @@ async function fetchInstagramComments(url: string, limit: number): Promise<strin
     .filter((text): text is string => !!text && text.length > 3);
 }
 
-// YouTube: already returns top comments by default (sorted by likes)
 async function fetchYouTubeComments(url: string, limit: number): Promise<string[]> {
   const run = await apify.actor("streamers/youtube-comments-scraper").call({
     startUrls: [{ url }],
     maxComments: limit,
-    // YouTube API defaults to top/relevance sort — no override needed
   });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
   return items
@@ -239,13 +220,12 @@ async function fetchYouTubeComments(url: string, limit: number): Promise<string[
     .filter((text): text is string => !!text && text.length > 3);
 }
 
-// Reddit: sort by "top" to get highest upvoted comments
 async function fetchRedditComments(url: string, limit: number): Promise<string[]> {
   const run = await apify.actor("trudax/reddit-scraper-lite").call({
     startUrls: [{ url }],
     skipComments: false,
     maxItems: limit,
-    sort: "top", // highest upvoted comments
+    sort: "top",
   });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
   return items
@@ -256,12 +236,11 @@ async function fetchRedditComments(url: string, limit: number): Promise<string[]
     .filter((text): text is string => !!text && text.length > 3);
 }
 
-// TikTok: sort by likes to get top comments
 async function fetchTikTokComments(url: string, limit: number): Promise<string[]> {
   const run = await apify.actor("clockworks/tiktok-comments-scraper").call({
     postURLs: [url],
     maxComments: limit,
-    sortBy: "likes", // most liked comments first
+    sortBy: "likes",
   });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
   return items
@@ -272,7 +251,6 @@ async function fetchTikTokComments(url: string, limit: number): Promise<string[]
     .filter((text): text is string => !!text && text.length > 3);
 }
 
-// X/Twitter: grab top replies by engagement
 async function fetchXComments(url: string, limit: number): Promise<string[]> {
   const run = await apify.actor("scraper_one/x-post-replies-scraper").call({
     postUrls: [url],
@@ -287,12 +265,11 @@ async function fetchXComments(url: string, limit: number): Promise<string[]> {
     .filter((text): text is string => !!text && text.length > 3);
 }
 
-// Facebook: "ranked" mode returns most relevant comments (Facebook's own algorithm)
 async function fetchFacebookComments(url: string, limit: number): Promise<string[]> {
   const run = await apify.actor("apify/facebook-comments-scraper").call({
     startUrls: [{ url }],
     maxComments: limit,
-    commentsMode: "RANKED_THREADED", // most relevant first, not chronological
+    commentsMode: "RANKED_THREADED",
   });
   const { items } = await apify.dataset(run.defaultDatasetId).listItems();
   return items
@@ -303,7 +280,6 @@ async function fetchFacebookComments(url: string, limit: number): Promise<string
     .filter((text): text is string => !!text && text.length > 3);
 }
 
-// LinkedIn: no sort option available — grabs most recent by default
 async function fetchLinkedInComments(url: string, limit: number): Promise<string[]> {
   const run = await apify.actor("apimaestro/linkedin-post-comments-replies-engagements-scraper-no-cookies").call({
     postIds: [url],
@@ -333,10 +309,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unsupported platform" }, { status: 400 });
     }
 
-    // Verify Pro status server-side — never trust the frontend
+    // Verify Pro + signed-in status server-side
     const { userId } = await auth();
     let isPro = false;
+    let isSignedIn = false;
+
     if (userId) {
+      isSignedIn = true;
       const { data: proUser } = await supabase
         .from("pro_users")
         .select("is_pro")
@@ -345,7 +324,23 @@ export async function POST(request: NextRequest) {
       isPro = proUser?.is_pro === true;
     }
 
-    // Check cache first — return instantly if already analyzed
+    // --- Signed-in free user limit check ---
+    // Pro users skip this. Anonymous users are handled on the frontend via localStorage.
+    if (isSignedIn && !isPro) {
+      const { data: usage } = await supabase
+        .from("user_usage")
+        .select("analysis_count")
+        .eq("clerk_user_id", userId)
+        .single();
+
+      const currentCount = usage?.analysis_count ?? 0;
+
+      if (currentCount >= FREE_USER_ANALYSIS_LIMIT) {
+        return NextResponse.json({ error: "free_limit_reached" }, { status: 403 });
+      }
+    }
+
+    // Check cache first
     const { data: cached } = await supabase
       .from("analyses")
       .select("id, analysis, prompt_version, is_pro")
@@ -361,10 +356,10 @@ export async function POST(request: NextRequest) {
         cached: true,
         id: cached.id,
         isPro: cached.is_pro ?? false,
+        isSignedIn,
       });
     }
 
-    // Pro users get more comments = deeper analysis
     const commentLimit = isPro ? PRO_COMMENT_LIMIT : FREE_COMMENT_LIMIT;
 
     let comments: string[] = [];
@@ -392,16 +387,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Filter spam/noise before Claude sees anything
     const filteredComments = filterComments(comments);
-    // If filtering wiped almost everything, fall back to raw comments
     const commentsToAnalyze = filteredComments.length >= 5 ? filteredComments : comments;
 
     const commentsText = commentsToAnalyze
       .map((c: string, i: number) => `${i + 1}. ${c}`)
       .join("\n");
 
-    // Pro gets the extended prompt with 3 extra deep dive fields
     const prompt = isPro
       ? `${DUKAY_PROMPT}${PRO_EXTENSION}\n\nHere are the comments to analyze:\n\n${commentsText}`
       : `${DUKAY_PROMPT}\n\nHere are the comments to analyze:\n\n${commentsText}`;
@@ -428,7 +420,7 @@ export async function POST(request: NextRequest) {
 
     const analysis = JSON.parse(cleaned);
 
-    // Save to Supabase
+    // Save analysis to Supabase
     let analysisId = null;
     try {
       const { data: saved } = await supabase
@@ -448,7 +440,34 @@ export async function POST(request: NextRequest) {
       console.error("DB save error:", dbError);
     }
 
-    return NextResponse.json({ analysis, platform: platformLabel, id: analysisId, isPro });
+    // Increment usage count for signed-in free users
+    if (isSignedIn && !isPro) {
+      try {
+        const { data: existing } = await supabase
+          .from("user_usage")
+          .select("analysis_count")
+          .eq("clerk_user_id", userId)
+          .single();
+
+        if (existing) {
+          await supabase
+            .from("user_usage")
+            .update({
+              analysis_count: existing.analysis_count + 1,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("clerk_user_id", userId);
+        } else {
+          await supabase
+            .from("user_usage")
+            .insert({ clerk_user_id: userId, analysis_count: 1 });
+        }
+      } catch (usageError) {
+        console.error("Usage tracking error:", usageError);
+      }
+    }
+
+    return NextResponse.json({ analysis, platform: platformLabel, id: analysisId, isPro, isSignedIn });
   } catch (error) {
     console.error("Analysis error:", error);
     return NextResponse.json(

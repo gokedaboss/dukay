@@ -12,7 +12,7 @@ export async function GET() {
     const { userId } = await auth();
 
     if (!userId) {
-      return NextResponse.json({ isPro: false });
+      return NextResponse.json({ isPro: false, isSignedIn: false });
     }
 
     const { data: proUser } = await supabase
@@ -21,9 +21,12 @@ export async function GET() {
       .eq("clerk_user_id", userId)
       .single();
 
-    return NextResponse.json({ isPro: proUser?.is_pro === true });
+    return NextResponse.json({
+      isPro: proUser?.is_pro === true,
+      isSignedIn: true,
+    });
   } catch (error) {
     console.error("Pro status error:", error);
-    return NextResponse.json({ isPro: false });
+    return NextResponse.json({ isPro: false, isSignedIn: false });
   }
 }

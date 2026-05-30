@@ -47,15 +47,20 @@ body {
 }
 
 /* ============================================
-   LIGHT MODE — force solid dark text on everything
+   LIGHT MODE
    ============================================ */
 
-[data-theme="light"] * {
+[data-theme="light"] body,
+[data-theme="light"] main {
+  background-color: #f5f4f2 !important;
   color: #1a1a1a !important;
-  border-color: rgba(0,0,0,0.12) !important;
 }
 
-[data-theme="light"] [class*="bg-white"],
+[data-theme="light"] nav {
+  background-color: rgba(245,244,242,0.92) !important;
+}
+
+/* Cards and surfaces */
 [data-theme="light"] [class*="bg-white\/"] {
   background-color: #eeecea !important;
 }
@@ -64,15 +69,7 @@ body {
   background-color: rgba(0,0,0,0.08) !important;
 }
 
-[data-theme="light"] body,
-[data-theme="light"] main {
-  background-color: #f5f4f2 !important;
-}
-
-[data-theme="light"] nav {
-  background-color: rgba(245,244,242,0.92) !important;
-}
-
+/* Input field */
 [data-theme="light"] input {
   background-color: #e5e3e0 !important;
   color: #1a1a1a !important;
@@ -83,32 +80,92 @@ body {
   opacity: 1 !important;
 }
 
+/* Platform icons */
 [data-theme="light"] [class*="fill-white"] {
-  fill: rgba(26,26,26,0.4) !important;
+  fill: rgba(26,26,26,0.5) !important;
 }
 
-/* Keep orange accent color in light mode */
+/* Text */
+[data-theme="light"] p,
+[data-theme="light"] h1,
+[data-theme="light"] h2,
+[data-theme="light"] h3,
+[data-theme="light"] label {
+  color: #1a1a1a !important;
+}
+
+[data-theme="light"] [class*="text-white\/20"],
+[data-theme="light"] [class*="text-white\/30"],
+[data-theme="light"] [class*="text-white\/40"] {
+  color: rgba(26,26,26,0.4) !important;
+}
+
+[data-theme="light"] [class*="text-white\/50"],
+[data-theme="light"] [class*="text-white\/60"] {
+  color: rgba(26,26,26,0.6) !important;
+}
+
+[data-theme="light"] [class*="text-white\/70"],
+[data-theme="light"] [class*="text-white\/80"] {
+  color: rgba(26,26,26,0.8) !important;
+}
+
+[data-theme="light"] [class*="text-white"]:not([class*="text-white\/"]) {
+  color: #1a1a1a !important;
+}
+
+/* Borders */
+[data-theme="light"] [class*="border-white\/"] {
+  border-color: rgba(0,0,0,0.12) !important;
+}
+
+/* Keep orange accent text */
 [data-theme="light"] [class*="text-\[#FF6B00\]"],
 [data-theme="light"] [class*="text-\[#e05e00\]"] {
   color: #e05e00 !important;
 }
 
-/* Keep red/green/orange verdict colors */
-[data-theme="light"] [class*="text-red-"] {
-  color: #dc2626 !important;
+/* Verdict colors */
+[data-theme="light"] [class*="text-red-"] { color: #dc2626 !important; }
+[data-theme="light"] [class*="text-green-"] { color: #16a34a !important; }
+[data-theme="light"] [class*="text-orange-"] { color: #ea580c !important; }
+
+/* Buttons — stay orange with WHITE text */
+[data-theme="light"] button[class*="bg-\[#FF6B00\]"],
+[data-theme="light"] button[class*="bg-\[#e05e00\]"],
+[data-theme="light"] a[class*="bg-\[#FF6B00\]"],
+[data-theme="light"] a[class*="bg-\[#e05e00\]"] {
+  background-color: #e05e00 !important;
+  color: #ffffff !important;
 }
 
-[data-theme="light"] [class*="text-green-"] {
-  color: #16a34a !important;
+/* Non-button orange backgrounds → dark grey */
+[data-theme="light"] div[class*="bg-\[#FF6B00\]"],
+[data-theme="light"] div[class*="bg-\[#e05e00\]"] {
+  background-color: #2e2e2e !important;
 }
 
-[data-theme="light"] [class*="text-orange-"] {
-  color: #ea580c !important;
+[data-theme="light"] div[class*="bg-\[#FF6B00\]"] *,
+[data-theme="light"] div[class*="bg-\[#e05e00\]"] * {
+  color: #ffffff !important;
 }
 
-/* Keep spinner and progress bar colors */
-[data-theme="light"] [class*="border-\[#FF6B00\]"],
-[data-theme="light"] [class*="bg-\[#FF6B00\]"] {
-  border-color: #e05e00 !important;
+/* Orange tinted backgrounds → light grey */
+[data-theme="light"] [class*="bg-\[#FF6B00\]\/"] {
+  background-color: rgba(0,0,0,0.06) !important;
+}
+
+/* Orange borders → subtle dark */
+[data-theme="light"] [class*="border-\[#FF6B00\]\/"] {
+  border-color: rgba(0,0,0,0.2) !important;
+}
+
+/* Spinner */
+[data-theme="light"] [class*="border-t-\[#FF6B00\]"] {
+  border-top-color: #e05e00 !important;
+}
+
+/* Progress bar fill */
+[data-theme="light"] .bg-\[#FF6B00\] {
   background-color: #e05e00 !important;
 }
