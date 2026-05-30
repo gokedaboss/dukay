@@ -3,12 +3,13 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const { data, error } = await supabase
       .from("analyses")
       .select("id, url, platform, analysis, is_pro, created_at")
-      .eq("id", params.id)
+      .eq("id", id)
       .single();
 
     if (error || !data) return NextResponse.json({ error: "Not found" }, { status: 404 });
