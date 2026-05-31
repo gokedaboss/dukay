@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 type BacklashVerdict = "real" | "mixed" | "noise";
 
@@ -16,22 +16,15 @@ type AnalysisResult = {
   representative_comments: string[];
   comments_section_label: string;
   overall_vibe: string;
-  vibe_breakdown: {
-    funny: number;
-    positive: number;
-    negative: number;
-    opposing: number;
-  };
+  vibe_breakdown: { funny: number; positive: number; negative: number; opposing: number; };
   vibe_interpretation: string;
-  confidence_score?: string;
-  deep_disagreement?: string;
-  minority_opinion?: string;
+  confidence_score?: string[];
+  deep_disagreement?: string[];
+  minority_opinion?: string[];
+  getting_wrong?: string[];
 };
 
-const supportedPlatforms = [
-  "instagram.com","youtube.com","youtu.be","reddit.com","tiktok.com",
-  "x.com","twitter.com","facebook.com","linkedin.com",
-];
+const supportedPlatforms = ["instagram.com","youtube.com","youtu.be","reddit.com","tiktok.com","x.com","twitter.com","facebook.com","linkedin.com"];
 
 const platformIcons = [
   { label: "Instagram", path: "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" },
@@ -71,7 +64,7 @@ function SignupGatePopup({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-[#0f0f0f] border border-white/15 rounded-2xl p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center gap-5">
-        <button onClick={onClose} className="absolute top-4 right-4 text-white/30 hover:text-white/60 transition text-lg leading-none" aria-label="Close">✕</button>
+        <button onClick={onClose} className="absolute top-4 right-4 text-white/30 hover:text-white/60 transition text-lg leading-none">✕</button>
         <div className="w-12 h-12 rounded-full bg-[#FF6B00]/10 border border-[#FF6B00]/30 flex items-center justify-center text-2xl">🔒</div>
         <div>
           <p className="text-white font-black text-xl mb-2">You've used your 2 free analyses</p>
@@ -94,7 +87,7 @@ function ProGatePopup({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-[#0f0f0f] border border-[#FF6B00]/20 rounded-2xl p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center gap-5">
-        <button onClick={onClose} className="absolute top-4 right-4 text-white/30 hover:text-white/60 transition text-lg leading-none" aria-label="Close">✕</button>
+        <button onClick={onClose} className="absolute top-4 right-4 text-white/30 hover:text-white/60 transition text-lg leading-none">✕</button>
         <div className="w-12 h-12 rounded-full bg-[#FF6B00]/10 border border-[#FF6B00]/30 flex items-center justify-center text-2xl">⚡</div>
         <div>
           <p className="text-white font-black text-xl mb-2">You've used all 3 free analyses</p>
@@ -105,10 +98,10 @@ function ProGatePopup({ onClose }: { onClose: () => void }) {
           <p className="text-white/20 text-xs">Cancel anytime</p>
         </div>
         <div className="w-full border-t border-white/10 pt-4 space-y-2 text-left">
-          {["Unlimited analyses","Deep Dive analysis","Unlimited Q&A per analysis","Saved history"].map((feature) => (
-            <div key={feature} className="flex items-center gap-2">
+          {["Unlimited analyses","Deep Dive analysis","Unlimited Q&A per analysis","Saved history"].map((f) => (
+            <div key={f} className="flex items-center gap-2">
               <span className="text-[#FF6B00] text-xs">✓</span>
-              <span className="text-white/60 text-xs">{feature}</span>
+              <span className="text-white/60 text-xs">{f}</span>
             </div>
           ))}
         </div>
@@ -124,7 +117,7 @@ function QAPanel({ analysisId, isPro, isLight }: { analysisId: string; isPro: bo
   const [qaError, setQaError] = useState("");
   const [qaUsed, setQaUsed] = useState(false);
 
-  const presetQuestions = ["Why are people mad?","What's the strongest defense?","What joke keeps repeating?"];
+  const presetQuestions = ["Why are people upset?","Is this cringe?","What do people find insightful?"];
 
   const getSessionId = () => {
     let sessionId = localStorage.getItem("dukay_session");
@@ -138,8 +131,8 @@ function QAPanel({ analysisId, isPro, isLight }: { analysisId: string; isPro: bo
     try {
       const res = await fetch("/api/qa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ analysisId, question, sessionId: getSessionId() }) });
       const data = await res.json();
-      if (data.error === "free_limit_reached") { setQaError("free_limit_reached"); }
-      else if (data.error) { setQaError("Couldn't get an answer. Try again."); }
+      if (data.error === "free_limit_reached") setQaError("free_limit_reached");
+      else if (data.error) setQaError("Couldn't get an answer. Try again.");
       else { setQaAnswer(data.answer); setQaUsed(true); }
     } catch { setQaError("Something went wrong."); }
     finally { setQaLoading(false); }
@@ -148,18 +141,18 @@ function QAPanel({ analysisId, isPro, isLight }: { analysisId: string; isPro: bo
   const handleUnlockPro = async () => {
     const res = await fetch("/api/stripe/checkout", { method: "POST" });
     const data = await res.json();
-    if (data.url) { window.location.href = data.url; }
+    if (data.url) window.location.href = data.url;
     else if (data.error === "Not signed in") { localStorage.setItem("dukay_pending_checkout", "true"); window.location.href = "/sign-in"; }
   };
 
-  // Light mode style helpers
   const cardBg = isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.05)";
   const cardBorder = isLight ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)";
-  const labelColor = isLight ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)";
+  const labelColor = isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.4)";
   const inputBg = isLight ? "#e5e3e0" : "rgba(255,255,255,0.05)";
-  const inputBorder = isLight ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.15)";
+  const inputBorder = isLight ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.15)";
   const inputText = isLight ? "#1a1a1a" : "#ffffff";
-  const mutedText = isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)";
+  const mutedText = isLight ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.5)";
+  const bodyText = isLight ? "#1a1a1a" : "#ffffff";
   const accent = "#FF6B00";
 
   return (
@@ -168,65 +161,173 @@ function QAPanel({ analysisId, isPro, isLight }: { analysisId: string; isPro: bo
         <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widest uppercase mb-1">Ask the comments</p>
         <p style={{ color: labelColor }} className="text-xs">Ask anything about what people are really saying.</p>
       </div>
-
       <div className="flex flex-wrap gap-2">
         {presetQuestions.map((q) => (
-          <button
-            key={q}
-            onClick={() => handleQa(q)}
-            disabled={qaLoading}
-            style={{
-              borderColor: qaQuestion === q && (qaLoading || !!qaAnswer) ? `${accent}80` : inputBorder,
-              color: qaQuestion === q && (qaLoading || !!qaAnswer) ? accent : mutedText,
-              backgroundColor: qaQuestion === q && (qaLoading || !!qaAnswer) ? `${accent}18` : "transparent",
-            }}
-            className="text-xs px-3 py-1.5 rounded-xl border font-medium transition disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {q}
-          </button>
+          <button key={q} onClick={() => handleQa(q)} disabled={qaLoading}
+            style={{ borderColor: qaQuestion === q && (qaLoading || !!qaAnswer) ? `${accent}80` : inputBorder, color: qaQuestion === q && (qaLoading || !!qaAnswer) ? accent : mutedText, backgroundColor: qaQuestion === q && (qaLoading || !!qaAnswer) ? `${accent}18` : "transparent" }}
+            className="text-xs px-3 py-1.5 rounded-xl border font-medium transition disabled:cursor-not-allowed disabled:opacity-40">{q}</button>
         ))}
       </div>
-
       {qaError !== "free_limit_reached" && (
         <div className="relative">
-          <input
-            type="text"
-            value={qaQuestion}
-            onChange={(e) => setQaQuestion(e.target.value)}
+          <input type="text" value={qaQuestion} onChange={(e) => setQaQuestion(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && qaQuestion.trim()) handleQa(qaQuestion.trim()); }}
             placeholder="Or ask your own question…"
             style={{ backgroundColor: inputBg, borderColor: inputBorder, color: inputText }}
-            className="w-full rounded-xl px-4 py-3 text-sm border outline-none pr-20 transition placeholder:opacity-40"
-          />
-          <button
-            onClick={() => qaQuestion.trim() && handleQa(qaQuestion.trim())}
-            disabled={!qaQuestion.trim() || qaLoading}
+            className="w-full rounded-xl px-4 py-3 text-sm border outline-none pr-20 transition placeholder:opacity-40" />
+          <button onClick={() => qaQuestion.trim() && handleQa(qaQuestion.trim())} disabled={!qaQuestion.trim() || qaLoading}
             style={{ backgroundColor: accent, color: "#ffffff" }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold px-3 py-1.5 rounded-lg hover:opacity-80 disabled:opacity-40 transition"
-          >
-            Ask
-          </button>
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold px-3 py-1.5 rounded-lg hover:opacity-80 disabled:opacity-40 transition">Ask</button>
         </div>
       )}
-
       {qaLoading && (
         <div className="flex items-center gap-3">
           <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: `${accent}30`, borderTopColor: accent }} />
           <p style={{ color: labelColor }} className="text-xs">Reading the comments…</p>
         </div>
       )}
-
       {qaAnswer && (
         <div style={{ borderLeftColor: `${accent}60` }} className="border-l-2 pl-4">
           <p style={{ color: isLight ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)" }} className="text-sm leading-relaxed">{qaAnswer}</p>
         </div>
       )}
-
       {!isPro && (qaUsed || qaError === "free_limit_reached") && (
         <div style={{ borderColor: cardBorder }} className="border rounded-xl p-4 flex flex-col items-center gap-2 text-center">
-          <p style={{ color: isLight ? "#1a1a1a" : "#ffffff" }} className="font-bold text-sm mb-0.5">Want the full picture?</p>
-          <p style={{ color: mutedText }} className="text-xs leading-relaxed">Deep Dive analyzes broader patterns, reply chains, and lets you ask unlimited questions.</p>
+          <p style={{ color: bodyText }} className="font-bold text-sm mb-0.5">Want the full picture?</p>
+          <p style={{ color: mutedText }} className="text-xs leading-relaxed">Deep Dive analyzes broader patterns and lets you ask unlimited questions.</p>
           <button onClick={handleUnlockPro} style={{ backgroundColor: accent, color: "#ffffff" }} className="text-xs font-bold px-5 py-2 rounded-xl hover:opacity-80 transition">Get the Deep Dive</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Deep Dive Section with tabs ---
+function DeepDiveSection({ analysis, analysisId, isLight, accent, labelColor, bodyText, mutedText, cardBg, cardBorder, url, setAnalysis, setLoading, startProgressSteps, stopProgressSteps }: {
+  analysis: AnalysisResult; analysisId: string | null; isLight: boolean; accent: string; labelColor: string; bodyText: string; mutedText: string; cardBg: string; cardBorder: string;
+  url: string; setAnalysis: (a: AnalysisResult) => void; setLoading: (b: boolean) => void;
+  startProgressSteps: () => void; stopProgressSteps: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"snapshot" | "deepdive">("snapshot");
+
+  const tabBase: React.CSSProperties = { padding: "12px 16px", borderRadius: "14px", border: "0.5px solid", cursor: "pointer", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", transition: "all 0.15s" };
+  const tabInactive: React.CSSProperties = { ...tabBase, backgroundColor: isLight ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.04)", borderColor: isLight ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)" };
+  const tabActiveSnap: React.CSSProperties = { ...tabBase, backgroundColor: cardBg, borderColor: isLight ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.2)", borderWidth: "1.5px" };
+  const tabActiveDeep: React.CSSProperties = { ...tabBase, backgroundColor: isLight ? "rgba(255,107,0,0.12)" : "rgba(255,107,0,0.08)", borderColor: isLight ? accent : `${accent}55`, borderWidth: "1.5px" };
+
+  // Fix: solid text colors for both themes
+  const tabTextActive = isLight ? "#1a1a1a" : "#ffffff";
+  const tabTextInactive = isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.4)";
+  const tabSubActive = isLight ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)";
+  const tabSubInactive = isLight ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)";
+  const textColor = isLight ? "rgba(0,0,0,0.78)" : "rgba(255,255,255,0.75)";
+
+  const BulletSection = ({ label, items, index, emphasis }: { label: string; items: string[]; index: number; emphasis?: boolean }) => (
+    <div style={{ paddingTop: index > 0 ? "16px" : "0", borderTop: index > 0 ? "0.5px solid rgba(255,107,0,0.15)" : "none" }}>
+      <p style={{ color: emphasis ? accent : `${accent}b0`, fontSize: emphasis ? "11px" : "10px", fontWeight: emphasis ? 700 : 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "10px" }}>{label}</p>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+        {items.map((item, i) => (
+          <li key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+            <span style={{ color: accent, fontSize: "10px", minWidth: "14px", paddingTop: "3px", flexShrink: 0 }}>◆</span>
+            <span style={{ color: textColor, fontSize: "14px", lineHeight: "1.5" }}>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  const handleReanalyze = async () => {
+    setLoading(true); startProgressSteps();
+    try {
+      const response = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, forceRefresh: true }) });
+      const data = await response.json();
+      if (data.analysis) setAnalysis(data.analysis);
+    } catch {}
+    finally { setLoading(false); stopProgressSteps(); }
+  };
+
+  return (
+    <div>
+      {/* Dükay Pro badge */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+        <span style={{ backgroundColor: accent, color: "#ffffff", fontSize: "11px", fontWeight: 900, letterSpacing: "0.06em", padding: "4px 12px", borderRadius: "20px" }}>DÜKAY PRO</span>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+        <button style={activeTab === "snapshot" ? tabActiveSnap : tabInactive} onClick={() => setActiveTab("snapshot")}>
+          <span style={{ fontSize: "16px" }}>⚡</span>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: activeTab === "snapshot" ? tabTextActive : tabTextInactive }}>Quick Snapshot</span>
+          <span style={{ fontSize: "11px", color: activeTab === "snapshot" ? tabSubActive : tabSubInactive }}>Key signals, fast</span>
+        </button>
+        <button style={activeTab === "deepdive" ? tabActiveDeep : tabInactive} onClick={() => setActiveTab("deepdive")}>
+          <span style={{ fontSize: "16px" }}>🔬</span>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: activeTab === "deepdive" ? accent : tabTextInactive }}>Deep Dive</span>
+          <span style={{ fontSize: "11px", color: activeTab === "deepdive" ? `${accent}90` : tabSubInactive }}>Full breakdown</span>
+        </button>
+      </div>
+
+      {/* Quick Snapshot tab */}
+      {activeTab === "snapshot" && (
+        <div style={{ backgroundColor: cardBg, borderColor: cardBorder }} className="border rounded-2xl p-5">
+          <p style={{ color: mutedText }} className="text-sm">Scroll up to see the full Quick Snapshot analysis.</p>
+        </div>
+      )}
+
+      {/* Deep Dive tab */}
+      {activeTab === "deepdive" && (
+        <div className="space-y-3">
+          {/* Re-analyze button at top */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <button onClick={handleReanalyze} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: mutedText, border: `0.5px solid ${cardBorder}`, background: "transparent", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>
+              ↻ Re-analyze with latest comments
+            </button>
+          </div>
+
+          {/* Q&A first */}
+          {analysisId && <QAPanel analysisId={analysisId} isPro={true} isLight={isLight} />}
+
+          {/* Evidence — representative comments */}
+          {analysis.representative_comments && analysis.representative_comments.length > 0 && (
+            <div style={{ backgroundColor: isLight ? "rgba(255,107,0,0.08)" : "rgba(255,107,0,0.05)", borderColor: isLight ? `${accent}50` : `${accent}30` }} className="border rounded-2xl p-5">
+              <p style={{ color: `${accent}b0`, fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "12px" }}>What People Are Actually Saying</p>
+              <div className="space-y-3">
+                {analysis.representative_comments.map((comment, i) => {
+                  const isMajority = comment.startsWith("MAJORITY:");
+                  const isMinority = comment.startsWith("MINORITY:");
+                  const cleanComment = comment.replace(/^(MAJORITY:|MINORITY:)\s*/i, "");
+                  return (
+                    <div key={i} style={{ borderLeftColor: `${accent}60` }} className="border-l-2 pl-4">
+                      {(isMajority || isMinority) && (
+                        <p style={{ color: `${accent}80`, fontSize: "9px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "4px" }}>
+                          {isMajority ? "Majority view" : "Minority view"}
+                        </p>
+                      )}
+                      <p style={{ color: textColor, fontSize: "14px", lineHeight: "1.5", fontStyle: "italic" }}>"{cleanComment}"</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Deep Dive sections — emphasis on Real Split and What People Might Be Getting Wrong */}
+          <div style={{ backgroundColor: isLight ? "rgba(255,107,0,0.08)" : "rgba(255,107,0,0.05)", borderColor: isLight ? `${accent}50` : `${accent}30` }} className="border rounded-2xl p-5">
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {analysis.confidence_score && analysis.confidence_score.length > 0 && (
+                <BulletSection label="Confidence" items={analysis.confidence_score} index={0} />
+              )}
+              {analysis.deep_disagreement && analysis.deep_disagreement.length > 0 && (
+                <BulletSection label="The Real Split" items={analysis.deep_disagreement} index={1} emphasis />
+              )}
+              {analysis.minority_opinion && analysis.minority_opinion.length > 0 && (
+                <BulletSection label="Minority Take" items={analysis.minority_opinion} index={2} />
+              )}
+              {analysis.getting_wrong && analysis.getting_wrong.length > 0 && (
+                <BulletSection label="What People Might Be Getting Wrong" items={analysis.getting_wrong} index={3} emphasis />
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -253,19 +354,20 @@ export default function Home() {
   const stepTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isLight = theme === "light";
-
-  // Reusable style tokens based on theme
   const cardBg = isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.05)";
   const cardBorder = isLight ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)";
-  const labelColor = isLight ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.4)";
+  const labelColor = isLight ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.4)";
   const bodyText = isLight ? "#1a1a1a" : "#ffffff";
-  const mutedText = isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)";
+  const mutedText = isLight ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.5)";
   const accent = "#FF6B00";
 
   useEffect(() => { return () => { if (stepTimeoutRef.current) clearTimeout(stepTimeoutRef.current); }; }, []);
 
   useEffect(() => {
-    fetch("/api/pro-status").then((res) => res.json()).then((data) => { setIsPro(data.isPro ?? false); setIsSignedIn(data.isSignedIn ?? false); if (data.isSignedIn) { fetch("/api/profile").then((r) => r.json()).then((p) => { if (p.name) setName(p.name); }).catch(() => {}); } }).catch(() => { setIsPro(false); setIsSignedIn(false); });
+    fetch("/api/pro-status").then((r) => r.json()).then((data) => {
+      setIsPro(data.isPro ?? false); setIsSignedIn(data.isSignedIn ?? false);
+      if (data.isSignedIn) { fetch("/api/profile").then((r) => r.json()).then((p) => { if (p.name) setName(p.name); }).catch(() => {}); }
+    }).catch(() => { setIsPro(false); setIsSignedIn(false); });
   }, []);
 
   useEffect(() => {
@@ -277,23 +379,17 @@ export default function Home() {
 
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("dukay_theme", next);
+    setTheme(next); document.documentElement.setAttribute("data-theme", next); localStorage.setItem("dukay_theme", next);
   };
 
   useEffect(() => {
     const pending = localStorage.getItem("dukay_pending_checkout");
-    if (pending) {
-      localStorage.removeItem("dukay_pending_checkout");
-      fetch("/api/stripe/checkout", { method: "POST" }).then((res) => res.json()).then((data) => { if (data.url) window.location.href = data.url; });
-    }
+    if (pending) { localStorage.removeItem("dukay_pending_checkout"); fetch("/api/stripe/checkout", { method: "POST" }).then((r) => r.json()).then((data) => { if (data.url) window.location.href = data.url; }); }
   }, []);
 
   const startProgressSteps = () => {
     setLoadingStage("fetch");
-    let stage: "fetch" | "analyze" = "fetch";
-    let index = 0;
+    let stage: "fetch" | "analyze" = "fetch"; let index = 0;
     const shuffledFetch = [...FETCH_MESSAGES].sort(() => Math.random() - 0.5);
     const shuffledAnalyze = [...ANALYZE_MESSAGES].sort(() => Math.random() - 0.5);
     const getShuffled = () => stage === "fetch" ? shuffledFetch : shuffledAnalyze;
@@ -324,17 +420,17 @@ export default function Home() {
     startProgressSteps();
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 90000);
+      const timeout = setTimeout(() => controller.abort(), 120000);
       const response = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: trimmedUrl }), signal: controller.signal });
       clearTimeout(timeout);
       const data = await response.json();
       if (data.error === "free_limit_reached") { setShowProGate(true); return; }
       if (data.error) {
         const isX = trimmedUrl.includes("x.com") || trimmedUrl.includes("twitter.com");
-        if (isX && data.error.includes("No comments")) { setError(errorMessages.x_restricted); }
-        else if (data.error.includes("private") || data.error.includes("restricted")) { setError(errorMessages.private); }
-        else if (data.error.includes("No comments")) { setError(errorMessages.no_comments); }
-        else { setError(errorMessages.default); }
+        if (isX && data.error.includes("No comments")) setError(errorMessages.x_restricted);
+        else if (data.error.includes("private") || data.error.includes("restricted")) setError(errorMessages.private);
+        else if (data.error.includes("No comments")) setError(errorMessages.no_comments);
+        else setError(errorMessages.default);
         return;
       }
       if (!isSignedIn && !isPro) incrementAnonCount();
@@ -342,7 +438,8 @@ export default function Home() {
       if (data.isPro !== undefined) setIsPro(data.isPro);
       if (data.isSignedIn !== undefined) setIsSignedIn(data.isSignedIn);
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") { setError(errorMessages.timeout); } else { setError(errorMessages.default); }
+      if (err instanceof Error && err.name === "AbortError") setError(errorMessages.timeout);
+      else setError(errorMessages.default);
     } finally { setLoading(false); stopProgressSteps(); }
   };
 
@@ -374,26 +471,9 @@ export default function Home() {
       <nav className="fixed top-0 left-0 right-0 flex justify-between items-center px-6 py-4 border-b backdrop-blur-md z-50" style={{ backgroundColor: "var(--nav-bg)", borderColor: "var(--border-subtle)" }}>
         <div className="flex items-center">
           <svg width="32" height="32" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
-            {isLight ? (
-              <>
-                <rect width="160" height="160" rx="28" fill="#E8621A"/>
-                <text x="80" y="128" fontFamily="Arial Black, Arial, sans-serif" fontSize="96" fontWeight="700" fill="#1a1a1a" textAnchor="middle">D</text>
-                <circle cx="122" cy="38" r="10" fill="#1a1a1a"/>
-                <circle cx="122" cy="38" r="17" fill="none" stroke="#1a1a1a" strokeWidth="2" opacity="0.5"/>
-                <circle cx="122" cy="38" r="24" fill="none" stroke="#1a1a1a" strokeWidth="1.5" opacity="0.25"/>
-              </>
-            ) : (
-              <>
-                <rect width="160" height="160" rx="28" fill="#1a1a1a"/>
-                <text x="80" y="128" fontFamily="Arial Black, Arial, sans-serif" fontSize="96" fontWeight="700" fill="#E8621A" textAnchor="middle">D</text>
-                <circle cx="122" cy="38" r="10" fill="#E8621A"/>
-                <circle cx="122" cy="38" r="17" fill="none" stroke="#E8621A" strokeWidth="2" opacity="0.5"/>
-                <circle cx="122" cy="38" r="24" fill="none" stroke="#E8621A" strokeWidth="1.5" opacity="0.25"/>
-              </>
-            )}
+            {isLight ? (<><rect width="160" height="160" rx="28" fill="#E8621A"/><text x="80" y="128" fontFamily="Arial Black, Arial, sans-serif" fontSize="96" fontWeight="700" fill="#1a1a1a" textAnchor="middle">D</text><circle cx="122" cy="38" r="10" fill="#1a1a1a"/><circle cx="122" cy="38" r="17" fill="none" stroke="#1a1a1a" strokeWidth="2" opacity="0.5"/><circle cx="122" cy="38" r="24" fill="none" stroke="#1a1a1a" strokeWidth="1.5" opacity="0.25"/></>) : (<><rect width="160" height="160" rx="28" fill="#1a1a1a"/><text x="80" y="128" fontFamily="Arial Black, Arial, sans-serif" fontSize="96" fontWeight="700" fill="#E8621A" textAnchor="middle">D</text><circle cx="122" cy="38" r="10" fill="#E8621A"/><circle cx="122" cy="38" r="17" fill="none" stroke="#E8621A" strokeWidth="2" opacity="0.5"/><circle cx="122" cy="38" r="24" fill="none" stroke="#E8621A" strokeWidth="1.5" opacity="0.25"/></>)}
           </svg>
         </div>
-        
         <div className="flex items-center gap-3">
           <button onClick={toggleTheme} style={{ borderColor: isLight ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.15)", color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)" }} className="w-8 h-8 flex items-center justify-center rounded-lg border transition text-sm" aria-label="Toggle theme">
             {isLight ? "🌙" : "☀️"}
@@ -422,27 +502,19 @@ export default function Home() {
         <p style={{ color: mutedText }} className="text-base font-light max-w-lg mx-auto mb-8 leading-relaxed">The comments don't lie. Stop scrolling and find out what they're really saying.</p>
 
         <div className="relative w-full max-w-2xl mx-auto mb-3">
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => { setUrl(e.target.value); setError(""); }}
+          <input type="url" value={url} onChange={(e) => { setUrl(e.target.value); setError(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") handleAnalyze(); }}
             placeholder="Paste a post — we'll read the comments for you..."
             style={{ backgroundColor: isLight ? "#e5e3e0" : "rgba(255,255,255,0.05)", borderColor: isLight ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.25)", color: bodyText }}
-            className="w-full rounded-2xl px-4 py-4 text-sm border outline-none pr-28 transition placeholder:opacity-40"
-          />
-          <button
-            onClick={handleAnalyze}
-            disabled={!url.trim() || loading}
+            className="w-full rounded-2xl px-4 py-4 text-sm border outline-none pr-28 transition placeholder:opacity-40" />
+          <button onClick={handleAnalyze} disabled={!url.trim() || loading}
             style={{ backgroundColor: accent, color: "#ffffff" }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold px-4 py-2 rounded-xl hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition"
-          >
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold px-4 py-2 rounded-xl hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition">
             {loading ? "..." : "Analyze"}
           </button>
         </div>
 
         {error && <p className="text-xs text-red-400 mb-3 max-w-sm text-center">{error}</p>}
-
         <p style={{ color: isLight ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.3)" }} className="text-xs mb-1">• No account needed to start</p>
         <p style={{ color: isLight ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.2)" }} className="text-xs italic mb-8">Designed for real conversations, not dashboards</p>
 
@@ -462,7 +534,7 @@ export default function Home() {
       {loading && (
         <div className="flex flex-col justify-center items-center py-16 gap-4">
           <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: `${accent}30`, borderTopColor: accent }} />
-          <p style={{ color: `${accent}80` }} className="text-[10px] font-semibold tracking-widest uppercase">Quick Snapshot</p>
+          <p style={{ color: `${accent}80` }} className="text-[10px] font-semibold tracking-widest uppercase">{isPro ? "Deep Dive" : "Quick Snapshot"}</p>
           <p style={{ color: mutedText }} className="text-sm animate-pulse">{loadingMessage}</p>
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full transition-all duration-700" style={{ backgroundColor: loadingStage === "fetch" ? accent : `${accent}40` }} />
@@ -475,13 +547,17 @@ export default function Home() {
       {analysis && (
         <section className="max-w-5xl mx-auto px-6 pb-24 space-y-3">
 
-          {platform && (
+          {/* Pro — tabs at top */}
+          {isPro && (
+            <DeepDiveSection analysis={analysis} analysisId={analysisId} isLight={isLight} accent={accent} labelColor={labelColor} bodyText={bodyText} mutedText={mutedText} cardBg={cardBg} cardBorder={cardBorder} url={url} setAnalysis={setAnalysis} setLoading={setLoading} startProgressSteps={startProgressSteps} stopProgressSteps={stopProgressSteps} />
+          )}
+
+          {/* Free — platform badge */}
+          {!isPro && platform && (
             <div className="flex items-center gap-2 pb-1">
               <span style={{ color: labelColor, backgroundColor: cardBg, borderColor: cardBorder }} className="text-[10px] font-semibold tracking-widest uppercase px-3 py-1 rounded-full border">{platform}</span>
               <span style={{ color: labelColor }} className="text-[10px]">·</span>
-              <span style={{ color: isPro ? accent : `${accent}99`, backgroundColor: isPro ? `${accent}18` : `${accent}0d`, borderColor: isPro ? `${accent}50` : `${accent}28` }} className="text-[10px] font-semibold tracking-widest uppercase px-3 py-1 rounded-full border">
-                {isPro ? "Deep Dive" : "Quick Snapshot"}
-              </span>
+              <span style={{ color: `${accent}99`, backgroundColor: `${accent}0d`, borderColor: `${accent}28` }} className="text-[10px] font-semibold tracking-widest uppercase px-3 py-1 rounded-full border">Quick Snapshot</span>
             </div>
           )}
 
@@ -493,25 +569,25 @@ export default function Home() {
           )}
 
           <div style={{ backgroundColor: cardBg, borderColor: cardBorder }} className="border rounded-2xl p-6">
-            <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widests uppercase mb-3">Main Takeaway</p>
+            <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widest uppercase mb-3">Main Takeaway</p>
             <p style={{ color: bodyText }} className="font-black text-2xl md:text-3xl leading-snug tracking-tight">{analysis.main_takeaway}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div style={{ backgroundColor: cardBg, borderColor: cardBorder }} className="border rounded-2xl p-5">
-              <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widests uppercase mb-3">Backlash</p>
+              <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widest uppercase mb-3">Backlash</p>
               <span className={`text-xs font-black px-3 py-1 rounded-full border ${backlashColor}`}>{analysis.backlash_verdict.toUpperCase()}</span>
               <p style={{ color: mutedText }} className="text-sm leading-relaxed mt-3">{analysis.backlash_reasoning}</p>
             </div>
             <div style={{ backgroundColor: cardBg, borderColor: cardBorder }} className="border rounded-2xl p-5">
-              <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widests uppercase mb-3">Overall Vibe</p>
+              <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widest uppercase mb-3">Overall Vibe</p>
               <p style={{ color: bodyText }} className="font-bold text-base leading-snug">{analysis.overall_vibe}</p>
               <p style={{ color: labelColor }} className="text-xs leading-relaxed mt-2">{analysis.vibe_interpretation}</p>
             </div>
           </div>
 
           <div style={{ backgroundColor: cardBg, borderColor: cardBorder }} className="border rounded-2xl p-5">
-            <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widests uppercase mb-4">Breakdown</p>
+            <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widest uppercase mb-4">Breakdown</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
               {Object.entries(analysis.vibe_breakdown).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-3">
@@ -527,40 +603,22 @@ export default function Home() {
 
           {analysis.representative_comments && analysis.representative_comments.length > 0 && (
             <div style={{ backgroundColor: cardBg, borderColor: cardBorder }} className="border rounded-2xl p-5">
-              <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widests uppercase mb-4">{analysis.comments_section_label || "What people kept saying"}</p>
+              <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widest uppercase mb-4">{analysis.comments_section_label || "What people kept saying"}</p>
               <div className="space-y-3">
-                {analysis.representative_comments.slice(0, 2).map((comment, i) => (
-                  <div key={i} style={{ borderLeftColor: `${accent}60` }} className="border-l-2 pl-4">
-                    <p style={{ color: isLight ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.7)" }} className="text-sm leading-relaxed italic">"{comment}"</p>
-                  </div>
-                ))}
+                {analysis.representative_comments.slice(0, 2).map((comment, i) => {
+                  const cleanComment = comment.replace(/^(MAJORITY:|MINORITY:)\s*/i, "");
+                  return (
+                    <div key={i} style={{ borderLeftColor: `${accent}60` }} className="border-l-2 pl-4">
+                      <p style={{ color: isLight ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.7)" }} className="text-sm leading-relaxed italic">"{cleanComment}"</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {isPro && analysis.confidence_score && (
-            <div style={{ backgroundColor: isLight ? "rgba(255,107,0,0.06)" : "rgba(255,107,0,0.05)", borderColor: `${accent}30` }} className="border rounded-2xl p-5 space-y-4">
-              <p style={{ color: `${accent}b0` }} className="text-[10px] font-semibold tracking-widest uppercase">Deep Dive</p>
-              <div>
-                <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widest uppercase mb-2">Confidence</p>
-                <p style={{ color: isLight ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)" }} className="text-sm leading-relaxed">{analysis.confidence_score}</p>
-              </div>
-              {analysis.deep_disagreement && (
-                <div>
-                  <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widest uppercase mb-2">The Real Split</p>
-                  <p style={{ color: isLight ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)" }} className="text-sm leading-relaxed">{analysis.deep_disagreement}</p>
-                </div>
-              )}
-              {analysis.minority_opinion && (
-                <div>
-                  <p style={{ color: labelColor }} className="text-[10px] font-semibold tracking-widest uppercase mb-2">The Minority Take</p>
-                  <p style={{ color: isLight ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)" }} className="text-sm leading-relaxed">{analysis.minority_opinion}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {analysisId && <QAPanel analysisId={analysisId} isPro={isPro} isLight={isLight} />}
+          {/* Q&A — free users only (Pro Q&A is inside Deep Dive tab) */}
+          {!isPro && analysisId && <QAPanel analysisId={analysisId} isPro={isPro} isLight={isLight} />}
 
           {analysisId && (
             <div className="flex justify-center pt-2">
@@ -573,18 +631,12 @@ export default function Home() {
           <div className="flex flex-col items-center gap-3 pt-2 pb-2">
             <p style={{ color: labelColor }} className="text-xs">Was this analysis useful?</p>
             <div className="flex gap-3">
-              <button
-                onClick={() => handleFeedback("useful")}
+              <button onClick={() => handleFeedback("useful")}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold transition ${feedback === "useful" ? "bg-green-500/20 border-green-500/40 text-green-600" : feedback ? "opacity-30" : ""}`}
-                style={!feedback || feedback !== "useful" ? { borderColor: cardBorder, color: mutedText } : {}}
-                disabled={!!feedback}
-              >👍 Useful</button>
-              <button
-                onClick={() => handleFeedback("not_useful")}
+                style={!feedback || feedback !== "useful" ? { borderColor: cardBorder, color: mutedText } : {}} disabled={!!feedback}>👍 Useful</button>
+              <button onClick={() => handleFeedback("not_useful")}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold transition ${feedback === "not_useful" ? "bg-red-500/20 border-red-500/40 text-red-600" : feedback ? "opacity-30" : ""}`}
-                style={!feedback || feedback !== "not_useful" ? { borderColor: cardBorder, color: mutedText } : {}}
-                disabled={!!feedback}
-              >👎 Not useful</button>
+                style={!feedback || feedback !== "not_useful" ? { borderColor: cardBorder, color: mutedText } : {}} disabled={!!feedback}>👎 Not useful</button>
             </div>
             {feedback && <p style={{ color: labelColor }} className="text-xs">{feedback === "useful" ? "Thanks — glad it helped." : "Thanks — we'll keep improving."}</p>}
           </div>

@@ -9,8 +9,9 @@ export async function GET() {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ isPro: false, isSignedIn: false });
 
-    const { data: proUser } = await supabase.from("pro_users").select("is_pro").eq("clerk_user_id", userId).single();
-    const isPro = proUser?.is_pro === true;
+const { data: proUser, error: proError } = await supabase.from("pro_users").select("is_pro").eq("clerk_user_id", userId).maybeSingle();
+console.log("PRO CHECK:", { userId, proUser, proError });
+const isPro = proUser?.is_pro === true;
 
     // Get reset countdown for free users
     let daysUntilReset: number | null = null;

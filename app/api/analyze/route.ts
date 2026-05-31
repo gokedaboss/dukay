@@ -104,10 +104,10 @@ Return your analysis in this exact JSON format and nothing else — no preamble,
     "A second pattern if one exists."
   ],
   "representative_comments": [
-    "A short real quote or close paraphrase from the comments that captures a repeated argument or dominant framing. Maximum 15 words.",
-    "A second short quote from a different angle that reinforces the analysis. Maximum 15 words."
+    "MAJORITY: The strongest real quote or close paraphrase representing the dominant viewpoint in the comments. Maximum 15 words.",
+    "MINORITY: The strongest real quote or close paraphrase representing a meaningful opposing or less common viewpoint. Maximum 15 words."
   ],
-  "comments_section_label": "Choose the most accurate label based on the conversation: 'Most repeated argument' if debate-heavy, 'What critics keep pointing out' if backlash-heavy, 'The joke everyone keeps making' if humor-heavy, 'The split in the comments' if polarized, 'What people kept saying' as default.",
+  "comments_section_label": "What People Are Actually Saying",
   "overall_vibe": "One plain sentence describing the dominant tone of the comment section.",
   "vibe_breakdown": {
     "funny": 40,
@@ -142,13 +142,36 @@ Rules:
 
 const PRO_EXTENSION = `
 
-This is a Deep Dive analysis. In addition to the standard JSON fields above, also include these three extra fields in your JSON response:
+This is a Deep Dive analysis. In addition to the standard JSON fields above, also include these four extra fields in your JSON response. Each field is an ARRAY of short bullet strings — never paragraphs.
 
-"confidence_score": "High confidence, Medium confidence, or Low confidence only — never a number or percentage. Follow with one plain sentence explaining why.",
-"deep_disagreement": "Go deeper than the standard disagreement field. Map out the two or three distinct camps in the comments — who they are, what they believe, and why they won't agree. Be specific. 3-4 sentences.",
-"minority_opinion": "The view held by a small but vocal group that the majority is ignoring or dismissing. Why are they saying it? Is there any merit to it? 2-3 sentences. If no clear minority opinion exists, say so plainly."
+"confidence_score": [
+  "High confidence, Medium confidence, or Low confidence — ONE of these three only, no percentage",
+  "One sentence explaining the main reason for that confidence level"
+],
 
-These three fields must appear at the end of the JSON object, after vibe_interpretation.`;
+"deep_disagreement": [
+  "One sentence describing the first camp — who they are and what they believe",
+  "One sentence describing the second camp — who they are and what they believe",
+  "One sentence on why these two sides are not connecting with each other"
+],
+
+"minority_opinion": [
+  "One sentence describing who holds this minority view and what they believe",
+  "One sentence on whether there is any merit to it — be direct and honest"
+],
+
+"getting_wrong": [
+  "One sentence on what most commenters are focused on or reacting to",
+  "One sentence on the deeper issue they are missing or misreading"
+]
+
+STRICT rules for Deep Dive bullets:
+- Every bullet is ONE sentence maximum — no exceptions
+- Maximum 3 bullets per section — cut mercilessly
+- No paragraphs, no essays, no long explanations
+- Each bullet must stand alone — cut anything that restates another bullet
+- The entire Deep Dive must be readable in 15 seconds
+- These four fields must appear at the end of the JSON object, after vibe_interpretation`;
 
 function detectPlatform(url: string): string {
   if (url.includes("instagram.com")) return "instagram";
@@ -204,7 +227,7 @@ async function fetchLinkedInComments(url: string, limit: number): Promise<string
 
 export async function POST(request: NextRequest) {
   try {
-    const { url } = await request.json();
+    const { url, forceRefresh } = await request.json();
     if (!url) return NextResponse.json({ error: "No URL provided" }, { status: 400 });
 
     const platform = detectPlatform(url);
@@ -242,9 +265,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: cached } = await supabase.from("analyses").select("id, analysis, prompt_version, is_pro").eq("url", url).order("created_at", { ascending: false }).limit(1).single();
-    if (cached?.analysis && cached?.prompt_version === PROMPT_VERSION) {
-      return NextResponse.json({ analysis: cached.analysis, platform: platformLabel, cached: true, id: cached.id, isPro: cached.is_pro ?? false, isSignedIn });
+    if (!forceRefresh) {
+      const { data: cached } = await supabase.from("analyses").select("id, analysis, prompt_version, is_pro").eq("url", url).order("created_at", { ascending: false }).limit(1).single();
+      if (cached?.analysis && cached?.prompt_version === PROMPT_VERSION) {
+        return NextResponse.json({ analysis: cached.analysis, platform: platformLabel, cached: true, id: cached.id, isPro: cached.is_pro ?? false, isSignedIn });
+      }
     }
 
     const commentLimit = isPro ? PRO_COMMENT_LIMIT : FREE_COMMENT_LIMIT;
